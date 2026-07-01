@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { mockDb } from '../../lib/mockDb';
 import { useAuth } from '../../context/AuthContext';
+import { API_BASE_URL } from '../../config';
 import { useToast } from '../../components/ui/Toast';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -77,7 +78,7 @@ export const GeneratorPage: React.FC = () => {
     const loadTemplates = async () => {
       try {
         const token = localStorage.getItem('pv_token');
-        const res = await fetch('http://127.0.0.1:8000/api/v1/templates', {
+        const res = await fetch(`${API_BASE_URL}/templates`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const json = await res.json();
@@ -199,7 +200,7 @@ export const GeneratorPage: React.FC = () => {
         formData.append('template_id', (selectedTemplate as any).realUuid);
         formData.append('file', uploadedFile);
 
-        const res = await fetch('http://127.0.0.1:8000/api/v1/documents/generate', {
+        const res = await fetch(`${API_BASE_URL}/documents/generate`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
@@ -215,7 +216,7 @@ export const GeneratorPage: React.FC = () => {
             'Rendering HTML preview layout...'
           ]);
           
-          const downloadRes = await fetch(`http://127.0.0.1:8000/api/v1/downloads/${json.data.id}?format=HTML`, {
+          const downloadRes = await fetch(`${API_BASE_URL}/downloads/${json.data.id}?format=HTML`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           const htmlText = await downloadRes.text();

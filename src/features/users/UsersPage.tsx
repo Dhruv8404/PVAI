@@ -31,6 +31,7 @@ import { Avatar } from '../../components/ui/Avatar';
 import { Modal } from '../../components/ui/Modal';
 import { Drawer } from '../../components/ui/Drawer';
 import { useToast } from '../../components/ui/Toast';
+import { API_BASE_URL } from '../../config';
 import { ConfirmDialog } from '../../components/shared/ConfirmDialog';
 
 const userSchema = z.object({
@@ -118,19 +119,19 @@ export const UsersPage: React.FC = () => {
       if (!token) throw new Error('No auth session token found');
 
       // Fetch Users
-      const usersRes = await fetch('http://127.0.0.1:8000/api/v1/users?limit=100', {
+      const usersRes = await fetch(`${API_BASE_URL}/users?limit=100`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const usersJson = await usersRes.json();
 
       // Fetch Templates
-      const templatesRes = await fetch('http://127.0.0.1:8000/api/v1/templates', {
+      const templatesRes = await fetch(`${API_BASE_URL}/templates`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const templatesJson = await templatesRes.json();
 
       // Fetch Documents
-      const docsRes = await fetch('http://127.0.0.1:8000/api/v1/documents/history', {
+      const docsRes = await fetch(`${API_BASE_URL}/documents/history`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const docsJson = await docsRes.json();
@@ -231,7 +232,7 @@ export const UsersPage: React.FC = () => {
         };
 
         if (editingUser) {
-          const res = await fetch(`http://127.0.0.1:8000/api/v1/users/${editingUser.id}`, {
+          const res = await fetch(`${API_BASE_URL}/users/${editingUser.id}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -250,7 +251,7 @@ export const UsersPage: React.FC = () => {
           }
         } else {
           // Send creation POST request (Default pwd: Password123!)
-          const res = await fetch('http://127.0.0.1:8000/api/v1/users', {
+          const res = await fetch(`${API_BASE_URL}/users`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -357,7 +358,7 @@ export const UsersPage: React.FC = () => {
       const token = localStorage.getItem('pv_token');
       if (token) {
         if (type === 'delete') {
-          const res = await fetch(`http://127.0.0.1:8000/api/v1/users/${userIds[0]}`, {
+          const res = await fetch(`${API_BASE_URL}/users/${userIds[0]}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -369,7 +370,7 @@ export const UsersPage: React.FC = () => {
             return;
           }
         } else if (type === 'deactivate') {
-          const res = await fetch(`http://127.0.0.1:8000/api/v1/users/${userIds[0]}/deactivate`, {
+          const res = await fetch(`${API_BASE_URL}/users/${userIds[0]}/deactivate`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -381,7 +382,7 @@ export const UsersPage: React.FC = () => {
             return;
           }
         } else if (type === 'activate') {
-          const res = await fetch(`http://127.0.0.1:8000/api/v1/users/${userIds[0]}/activate`, {
+          const res = await fetch(`${API_BASE_URL}/users/${userIds[0]}/activate`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -446,7 +447,7 @@ export const UsersPage: React.FC = () => {
     try {
       const token = localStorage.getItem('pv_token');
       if (token) {
-        const res = await fetch(`http://127.0.0.1:8000/api/v1/users/${user.id}/reset-password`, {
+        const res = await fetch(`${API_BASE_URL}/users/${user.id}/reset-password`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` }
         });

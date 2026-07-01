@@ -19,6 +19,7 @@ import { StatCard } from '../../components/shared/StatCard';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { API_BASE_URL } from '../../config';
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
@@ -35,7 +36,7 @@ export const DashboardPage: React.FC = () => {
     try {
       const token = localStorage.getItem('pv_token');
       if (token) {
-        const res = await fetch('http://127.0.0.1:8000/api/v1/dashboard', {
+        const res = await fetch(`${API_BASE_URL}/dashboard`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const json = await res.json();

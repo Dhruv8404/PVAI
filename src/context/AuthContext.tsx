@@ -21,9 +21,9 @@ export interface Notification {
   timestamp: string;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import { API_BASE_URL } from '../config';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);

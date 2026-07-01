@@ -26,6 +26,7 @@ import { Drawer } from '../../components/ui/Drawer';
 import { useToast } from '../../components/ui/Toast';
 import { ConfirmDialog } from '../../components/shared/ConfirmDialog';
 import { useAuth } from '../../context/AuthContext';
+import { API_BASE_URL } from '../../config';
 
 export const HistoryPage: React.FC = () => {
   const { user } = useAuth();
@@ -68,13 +69,13 @@ export const HistoryPage: React.FC = () => {
       const token = localStorage.getItem('pv_token');
       if (token) {
         // Load documents
-        const docsRes = await fetch('http://127.0.0.1:8000/api/v1/documents/history', {
+        const docsRes = await fetch(`${API_BASE_URL}/documents/history`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const docsJson = await docsRes.json();
 
         // Load templates
-        const templatesRes = await fetch('http://127.0.0.1:8000/api/v1/templates', {
+        const templatesRes = await fetch(`${API_BASE_URL}/templates`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const templatesJson = await templatesRes.json();
@@ -150,7 +151,7 @@ export const HistoryPage: React.FC = () => {
     try {
       const token = localStorage.getItem('pv_token');
       if (token) {
-        const res = await fetch(`http://127.0.0.1:8000/api/v1/documents/${deleteConfirm.docId}`, {
+        const res = await fetch(`${API_BASE_URL}/documents/${deleteConfirm.docId}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -181,7 +182,7 @@ export const HistoryPage: React.FC = () => {
       const token = localStorage.getItem('pv_token');
       if (token) {
         // Direct download trigger from FastAPI
-        window.open(`http://127.0.0.1:8000/api/v1/downloads/${doc.id}?format=HTML`, '_blank');
+        window.open(`${API_BASE_URL}/downloads/${doc.id}?format=HTML`, '_blank');
         toast.success(`Downloaded "${doc.name}" HTML compilation package.`, 'Download Started');
         loadVaultData();
         return;
@@ -208,7 +209,7 @@ export const HistoryPage: React.FC = () => {
     try {
       const token = localStorage.getItem('pv_token');
       if (!doc.htmlContent && token) {
-        const res = await fetch(`http://127.0.0.1:8000/api/v1/downloads/${doc.id}?format=HTML`, {
+        const res = await fetch(`${API_BASE_URL}/downloads/${doc.id}?format=HTML`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const htmlText = await res.text();
