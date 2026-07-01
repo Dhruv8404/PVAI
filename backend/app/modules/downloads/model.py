@@ -9,12 +9,12 @@ class DownloadLog(Base):
     __tablename__ = "download_logs"
     
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    generated_document_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("generated_documents.id", ondelete="CASCADE"), nullable=False)
-    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    generated_document_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("generated_documents.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     
     format: Mapped[str] = mapped_column(String(10), nullable=False) # HTML, PDF
     ip_address: Mapped[str] = mapped_column(String(50), nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), index=True)
 
     # Relationships
     document: Mapped["GeneratedDocument"] = relationship(lazy="selectin")

@@ -17,7 +17,6 @@ import {
   Copy,
   Info
 } from 'lucide-react';
-import { mockDb } from '../../lib/mockDb';
 import type { GeneratedDocument, DocumentTemplate } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardContent } from '../../components/ui/Card';
@@ -115,12 +114,9 @@ export const HistoryPage: React.FC = () => {
         }
       }
     } catch (err: any) {
-      console.warn('API error in history loader, falling back to mockDb:', err.message);
+      console.error('API error in history loader:', err.message);
+      setLoading(false);
     }
-
-    setDocuments(mockDb.getDocuments());
-    setTemplates(mockDb.getTemplates());
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -164,16 +160,7 @@ export const HistoryPage: React.FC = () => {
         }
       }
     } catch (err: any) {
-      console.warn('API delete document failed, using mockDb fallback:', err.message);
-    }
-
-    try {
-      mockDb.deleteDocument(deleteConfirm.docId);
-      toast.success('Document audit record removed from system database (Offline Mode).', 'Log Erased');
-      setDeleteConfirm(prev => ({ ...prev, isOpen: false }));
-      loadVaultData();
-    } catch (err: any) {
-      toast.error(err.message || 'Error occurred.');
+      toast.error(err.message || 'Failed to delete document from database');
     }
   };
 
@@ -188,21 +175,8 @@ export const HistoryPage: React.FC = () => {
         return;
       }
     } catch (err: any) {
-      console.warn('API download failed, falling back to mockDb:', err.message);
+      toast.error(err.message || 'Failed to download document from database');
     }
-
-    mockDb.toggleDownloaded(doc.id);
-    const blob = new Blob([doc.htmlContent], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${doc.name}.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast.success(`Downloaded "${doc.name}" HTML compilation package (Offline Mode).`, 'Download Started');
-    loadVaultData();
   };
 
   const handleOpenPreview = async (doc: GeneratedDocument) => {
@@ -216,7 +190,7 @@ export const HistoryPage: React.FC = () => {
         doc.htmlContent = htmlText;
       }
     } catch (err: any) {
-      console.warn('API fetch document HTML failed:', err.message);
+      toast.error(err.message || 'Failed to load document preview');
     }
     setPreviewDoc(doc);
   };

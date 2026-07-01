@@ -1,6 +1,18 @@
+import os
 import time
 from abc import ABC, abstractmethod
 from app.core.exceptions import ValidationException
+
+def load_drafting_studio_html() -> str:
+    template_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+        "templates",
+        "drafting_studio.html"
+    )
+    if os.path.exists(template_path):
+        with open(template_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h1>PV Drafting Studio Template Not Found</h1>"
 
 
 class DocumentGenerator(ABC):
@@ -43,19 +55,7 @@ class PSURGenerator(DocumentGenerator):
         }
 
     def generate_html(self, data: dict, file_name: str) -> str:
-        return f"""
-        <div style="font-family: sans-serif; padding: 24px; color: #1f2937; background: #ffffff;">
-          <h1 style="color: #4f46e5; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; margin-top: 0;">Periodic Safety Update Report (PSUR)</h1>
-          <p style="color: #6b7280; font-size: 13px;">Source Worksheet: {file_name} | Status: {data['status']}</p>
-          
-          <div style="margin: 20px 0; padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; background-color: #f9fafb;">
-            <h3 style="margin-top: 0; color: #111827;">Compliance Check Overview</h3>
-            <p style="font-size: 14px;">Total Row Entries Checked: <strong>{data['total_records']} Adverse Events</strong></p>
-            <p style="font-size: 14px;">Severe Adverse Cases Detected: <strong style="color: #ef4444;">{data['severe_cases']} (Critical)</strong></p>
-            <p style="font-size: 14px;">Safety Index Variance: <strong>{data['variance']} (Within tolerances)</strong></p>
-          </div>
-        </div>
-        """
+        return load_drafting_studio_html()
 
 
 class QuantitativeMethodGenerator(DocumentGenerator):
@@ -79,19 +79,7 @@ class QuantitativeMethodGenerator(DocumentGenerator):
         }
 
     def generate_html(self, data: dict, file_name: str) -> str:
-        return f"""
-        <div style="font-family: sans-serif; padding: 24px; color: #1f2937; background: #ffffff;">
-          <h1 style="color: #0d9488; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; margin-top: 0;">Quantitative Method (Non-DME) Analysis</h1>
-          <p style="color: #6b7280; font-size: 13px;">Source Worksheet: {file_name} | Status: {data['status']}</p>
-          
-          <div style="margin: 20px 0; padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; background-color: #f0fdfa;">
-            <h3 style="margin-top: 0; color: #115e59;">Z-Score Quantitative Check</h3>
-            <p style="font-size: 14px;">Active Method Indices Checked: <strong>{data['total_methods']} Records</strong></p>
-            <p style="font-size: 14px;">Statistical Critical Z-Score Threshold: <strong>{data['threshold']}</strong></p>
-            <p style="font-size: 14px; color: #b91c1c; font-weight: bold;">Outliers Flagged: {data['outliers']} Methods Detected</p>
-          </div>
-        </div>
-        """
+        return load_drafting_studio_html()
 
 
 class PVAutoGenerator(DocumentGenerator):
@@ -114,18 +102,7 @@ class PVAutoGenerator(DocumentGenerator):
         }
 
     def generate_html(self, data: dict, file_name: str) -> str:
-        return f"""
-        <div style="font-family: sans-serif; padding: 24px; color: #1f2937; background: #ffffff;">
-          <h1 style="color: #7c3aed; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; margin-top: 0;">PV Auto Signal Detection Report</h1>
-          <p style="color: #6b7280; font-size: 13px;">Source Worksheet: {file_name} | Status: {data['status']}</p>
-          
-          <div style="margin: 20px 0; padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; background-color: #faf5ff;">
-            <h3 style="margin-top: 0; color: #6b21a8;">Signal Detections Triggered</h3>
-            <p style="font-size: 14px;">Total AutoCode Inputs Processed: <strong>{data['total_inputs']} AEs</strong></p>
-            <p style="font-size: 14px;">PRR Ratio Alert Threshold: <strong>{data['alert_threshold']}</strong></p>
-          </div>
-        </div>
-        """
+        return load_drafting_studio_html()
 
 
 def get_generator_strategy(template_id: str) -> DocumentGenerator:

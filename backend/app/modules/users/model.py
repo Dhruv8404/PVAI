@@ -59,7 +59,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), default="Active") # Active, Inactive
+    status: Mapped[str] = mapped_column(String(20), default="Active", index=True) # Active, Inactive
     report_limit: Mapped[int] = mapped_column(Integer, default=5)
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))

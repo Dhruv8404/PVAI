@@ -22,7 +22,6 @@ import {
   FileText,
   Users
 } from 'lucide-react';
-import { mockDb } from '../../lib/mockDb';
 import type { User, DocumentTemplate, GeneratedDocument } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../../components/ui/Card';
@@ -195,13 +194,9 @@ export const UsersPage: React.FC = () => {
         return;
       }
     } catch (err: any) {
-      console.warn('FastAPI user directory endpoints offline, falling back to mockDb:', err.message);
+      console.error('API error in user directory loader:', err.message);
+      setLoading(false);
     }
-
-    setUsers(mockDb.getUsers());
-    setTemplates(mockDb.getTemplates());
-    setDocuments(mockDb.getDocuments());
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -274,39 +269,7 @@ export const UsersPage: React.FC = () => {
         }
       }
     } catch (err: any) {
-      console.warn('API save user failed, using mockDb fallback:', err.message);
-    }
-
-    // Mock Fallback
-    try {
-      if (editingUser) {
-        mockDb.saveUser({
-          ...editingUser,
-          ...data
-        } as any);
-        toast.success(`User settings for ${data.name} saved (Offline Mode).`, 'User Settings Saved');
-      } else {
-        mockDb.saveUser({
-          id: '',
-          avatarUrl: undefined,
-          name: data.name,
-          email: data.email,
-          role: data.role,
-          status: data.status,
-          createdDate: new Date().toISOString(),
-          lastLogin: 'Never',
-          documentsGenerated: 0,
-          reportLimit: data.reportLimit,
-          allowedTemplates: data.allowedTemplates
-        } as any);
-        toast.success(`Platform account initialized for ${data.name} (Offline Mode).`, 'Account Generated');
-      }
-      setIsFormOpen(false);
-      setEditingUser(null);
-      reset();
-      loadData();
-    } catch (err: any) {
-      toast.error(err.message || 'Validation error.');
+      toast.error(err.message || 'Failed to save user settings in database');
     }
   };
 
@@ -396,49 +359,7 @@ export const UsersPage: React.FC = () => {
         }
       }
     } catch (err: any) {
-      console.warn('API execution failed, falling back to mockDb:', err.message);
-    }
-
-    try {
-      if (type === 'delete') {
-        mockDb.deleteUser(userIds[0]);
-        toast.success('User account erased from system directory (Offline Mode).', 'Account Deleted');
-      } else if (type === 'deactivate') {
-        const users = mockDb.getUsers();
-        const user = users.find(u => u.id === userIds[0]);
-        if (user) {
-          user.status = 'Inactive';
-          mockDb.saveUser(user);
-          toast.success(`Deactivated user ${user.name} (Offline Mode).`, 'User Suspended');
-        }
-      } else if (type === 'activate') {
-        const users = mockDb.getUsers();
-        const user = users.find(u => u.id === userIds[0]);
-        if (user) {
-          user.status = 'Active';
-          mockDb.saveUser(user);
-          toast.success(`Re-activated user ${user.name} (Offline Mode).`, 'User Activated');
-        }
-      } else if (type === 'bulk-delete') {
-        userIds.forEach(uid => mockDb.deleteUser(uid));
-        toast.success(`Removed ${userIds.length} users from workspace (Offline Mode).`, 'Bulk Erasure Completed');
-        setSelectedUserIds([]);
-      } else if (type === 'bulk-deactivate') {
-        const users = mockDb.getUsers();
-        userIds.forEach(uid => {
-          const user = users.find(u => u.id === uid);
-          if (user) {
-            user.status = 'Inactive';
-            mockDb.saveUser(user);
-          }
-        });
-        toast.success(`Suspended ${userIds.length} seats (Offline Mode).`, 'Bulk Suspensions Active');
-        setSelectedUserIds([]);
-      }
-      setConfirmAction(prev => ({ ...prev, isOpen: false }));
-      loadData();
-    } catch (err: any) {
-      toast.error(err.message || 'Operation failed.');
+      toast.error(err.message || 'Failed to execute user directory operation');
     }
   };
 
@@ -462,32 +383,56 @@ export const UsersPage: React.FC = () => {
         }
       }
     } catch (err: any) {
-      console.warn('API reset password failed, falling back to mockDb:', err.message);
+      toast.error(err.message || 'Failed to reset password');
     }
-
-    const newPwd = mockDb.resetPassword(user.id);
-    setResetSuccess({
-      isOpen: true,
-      pwdStr: newPwd,
-      userName: user.name
-    });
   };
 
   // Handle template checks in Drawer
-  const handleToggleTemplateAccess = (userId: string, templateId: string) => {
-    const users = mockDb.getUsers();
-    const target = users.find(u => u.id === userId);
-    if (target) {
-      const exists = target.allowedTemplates.includes(templateId);
-      if (exists) {
-        target.allowedTemplates = target.allowedTemplates.filter(t => t !== templateId);
-      } else {
-        target.allowedTemplates.push(templateId);
+  const handleToggleTemplateAccess = async (userId: string, templateId: string) => {
+    try {
+      const token = localStorage.getItem('pv_token');
+      if (!token) throw new Error('No session token');
+
+      const targetUser = users.find(u => u.id === userId);
+      if (!targetUser) return;
+
+      const currentTemplates = targetUser.allowedTemplates || [];
+      const updatedTemplates = currentTemplates.includes(templateId)
+        ? currentTemplates.filter(t => t !== templateId)
+        : [...currentTemplates, templateId];
+
+      const allowedUuids = updatedTemplates.map(tId => {
+        const match = templates.find(t => {
+          const nameLower = t.name.toLowerCase();
+          const localId = nameLower.includes('psur') ? 'psur' : nameLower.includes('quant') ? 'quant' : 'pv_auto';
+          return localId === tId;
+        });
+        return match?.id;
+      }).filter(Boolean);
+
+      const res = await fetch(`${API_BASE_URL}/users/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          allowed_templates: allowedUuids
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Document template access revised.', 'Access Modified');
+        loadData();
+        if (profileUser && profileUser.id === userId) {
+          setProfileUser({
+            ...profileUser,
+            allowedTemplates: updatedTemplates
+          });
+        }
       }
-      mockDb.saveUser(target);
-      setProfileUser({ ...target });
-      loadData();
-      toast.success('Document template access revised.', 'Access Modified');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update template access in database');
     }
   };
 

@@ -9,11 +9,11 @@ class ActivityLog(Base):
     __tablename__ = "activity_logs"
     
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     
     action: Mapped[str] = mapped_column(String(50), nullable=False) # e.g. USER_LOGIN, DOC_GENERATE
     details: Mapped[str] = mapped_column(String(255), nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
 
     # Relationships
     user: Mapped["User"] = relationship(lazy="selectin")

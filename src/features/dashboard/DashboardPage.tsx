@@ -13,7 +13,6 @@ import {
   Mail,
   Clock
 } from 'lucide-react';
-import { mockDb } from '../../lib/mockDb';
 import { useAuth } from '../../context/AuthContext';
 import { StatCard } from '../../components/shared/StatCard';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../../components/ui/Card';
@@ -65,109 +64,11 @@ export const DashboardPage: React.FC = () => {
           return;
         }
       }
+      setLoading(false);
     } catch (err: any) {
-      console.warn('API error in dashboard loader, falling back to mockDb:', err.message);
+      console.error('API error in dashboard loader:', err.message);
+      setLoading(false);
     }
-
-    const allUsers = mockDb.getUsers();
-    const documents = mockDb.getDocuments();
-    const logs = mockDb.getAuditLogs();
-
-    if (user?.role === 'Admin') {
-      const totalUsers = allUsers.length;
-      const activeUsers = allUsers.filter(u => u.status === 'Active').length;
-      const inactiveUsers = allUsers.filter(u => u.status === 'Inactive').length;
-
-      const todayStr = new Date().toISOString().substring(0, 10);
-      const genToday = documents.filter(d => d.generatedTime.substring(0, 10) === todayStr).length;
-      const genMonth = documents.length; 
-
-      const totalDownloads = documents.filter(d => d.downloaded).length;
-
-      setMetrics({
-        totalUsers,
-        activeUsers,
-        inactiveUsers,
-        genToday,
-        genMonth,
-        totalDownloads,
-      });
-
-      const dailyGenData = [
-        { label: 'Mon', value: 12 },
-        { label: 'Tue', value: 18 },
-        { label: 'Wed', value: 15 },
-        { label: 'Thu', value: 24 },
-        { label: 'Fri', value: 30 + genToday },
-        { label: 'Sat', value: 8 },
-        { label: 'Sun', value: 5 },
-      ];
-      
-      const userGrowth = [
-        { label: 'Jan', value: 2 },
-        { label: 'Feb', value: 3 },
-        { label: 'Mar', value: 4 },
-        { label: 'Apr', value: 5 },
-        { label: 'May', value: 6 },
-        { label: 'Jun', value: totalUsers },
-      ];
-
-      setChartsData({
-        daily_documents: dailyGenData,
-        user_growth: userGrowth
-      });
-
-      const recentUsersSorted = [...allUsers]
-        .sort((a, b) => new Date(b.createdDate || '').getTime() - new Date(a.createdDate || '').getTime())
-        .slice(0, 5)
-        .map(u => ({
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          status: u.status,
-          created_at: u.createdDate
-        }));
-      setRecentUsers(recentUsersSorted);
-
-      setActivities(logs.slice(0, 5));
-    } else {
-      const todayStr = new Date().toISOString().substring(0, 10);
-      const userDocs = documents.filter(d => d.createdById === user?.id);
-      const genToday = userDocs.filter(d => d.generatedTime.substring(0, 10) === todayStr).length;
-      const genMonth = userDocs.length; 
-      const totalDownloads = userDocs.filter(d => d.downloaded).length;
-
-      setMetrics({
-        totalUsers: 0,
-        activeUsers: 0,
-        inactiveUsers: 0,
-        genToday,
-        genMonth,
-        totalDownloads,
-      });
-
-      const dailyGenData = [
-        { label: 'Mon', value: 1 },
-        { label: 'Tue', value: 2 },
-        { label: 'Wed', value: 1 },
-        { label: 'Thu', value: 3 },
-        { label: 'Fri', value: 2 + genToday },
-        { label: 'Sat', value: 0 },
-        { label: 'Sun', value: 0 },
-      ];
-
-      setChartsData({
-        daily_documents: dailyGenData,
-        user_growth: []
-      });
-
-      setRecentUsers([]);
-
-      const userLogs = logs.filter(l => l.userId === user?.id);
-      setActivities(userLogs.slice(0, 5));
-    }
-
-    setLoading(false);
   };
 
   useEffect(() => {
