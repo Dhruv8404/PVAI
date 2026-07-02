@@ -32,7 +32,10 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 
 def setup_middlewares(app: FastAPI) -> None:
-    # Add CORS
+    # Add Logging Middleware first (so it gets wrapped by CORS and runs inner-most)
+    app.add_middleware(RequestLoggingMiddleware)
+
+    # Add CORS last (so it wraps all other middlewares and runs outer-most)
     if settings.BACKEND_CORS_ORIGINS:
         app.add_middleware(
             CORSMiddleware,
@@ -42,6 +45,3 @@ def setup_middlewares(app: FastAPI) -> None:
             allow_methods=["*"],
             allow_headers=["*"],
         )
-        
-    # Add Logging Middleware
-    app.add_middleware(RequestLoggingMiddleware)
