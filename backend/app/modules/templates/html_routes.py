@@ -1,10 +1,14 @@
 import os
 import uuid
 import shutil
+import urllib.request
 from typing import List, Optional
 from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException, status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+import cloudinary
+import cloudinary.uploader
+
 from app.core.database import get_db
 from app.core.config import settings
 from app.core.dependencies import get_current_user, RoleRequirement
@@ -13,6 +17,14 @@ from app.modules.templates.model import HtmlTemplate
 from app.modules.templates.schema import HtmlTemplateResponse, HtmlTemplateDetailResponse
 from app.modules.auth.schema import ApiResponse
 
+# Configure Cloudinary
+cloudinary.config(
+    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+    api_key=settings.CLOUDINARY_API_KEY,
+    api_secret=settings.CLOUDINARY_API_SECRET,
+    secure=True
+)
+
 # Routers
 admin_router = APIRouter(prefix="/admin/templates", tags=["Admin HTML Templates"])
 public_router = APIRouter(prefix="/templates", tags=["Public HTML Templates"])
@@ -20,21 +32,41 @@ public_router = APIRouter(prefix="/templates", tags=["Public HTML Templates"])
 # Guards
 require_admin = RoleRequirement(["Admin"])
 
-# Helper to read HTML content safely
+# Helper to read HTML content safely (supports local files and Cloudinary URL targets)
 def read_html_content(filepath: str) -> str:
-    if not filepath or not os.path.exists(filepath):
+    if not filepath:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Template HTML file not found on disk"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Template file path/URL is empty."
         )
-    try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            return f.read()
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to read template content: {str(e)}"
-        )
+    
+    if filepath.startswith("http://") or filepath.startswith("https://"):
+        try:
+            req = urllib.request.Request(
+                filepath, 
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            )
+            with urllib.request.urlopen(req) as response:
+                return response.read().decode("utf-8")
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to fetch template from Cloudinary URL: {str(e)}"
+            )
+    else:
+        if not os.path.exists(filepath):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Template HTML file not found on disk"
+            )
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to read template content: {str(e)}"
+            )
 
 
 @admin_router.post("/upload", response_model=ApiResponse[HtmlTemplateResponse], dependencies=[Depends(require_admin)])
@@ -63,22 +95,38 @@ async def upload_html_template(
         )
     await file.seek(0) # Reset stream pointer
 
-    # 3. Ensure template directory exists
-    os.makedirs(settings.TEMPLATES_DIR, exist_ok=True)
+    # 3. Save file uniquely (either Cloudinary or Local)
+    if settings.STORAGE_TYPE == "cloudinary":
+        try:
+            upload_result = cloudinary.uploader.upload(
+                content,
+                resource_type="raw",
+                folder="pv_templates",
+                public_id=f"{uuid.uuid4().hex}.html"
+            )
+            filepath = upload_result.get("secure_url")
+            if not filepath:
+                raise Exception("Cloudinary secure_url is empty in response.")
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to upload template to Cloudinary: {str(e)}"
+            )
+    else:
+        # Ensure template directory exists
+        os.makedirs(settings.TEMPLATES_DIR, exist_ok=True)
+        filename = f"{uuid.uuid4().hex}.html"
+        filepath = os.path.join(settings.TEMPLATES_DIR, filename)
+        try:
+            with open(filepath, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to write template file to storage: {str(e)}"
+            )
 
-    # 4. Save file uniquely on disk
-    filename = f"{uuid.uuid4().hex}.html"
-    filepath = os.path.join(settings.TEMPLATES_DIR, filename)
-    try:
-        with open(filepath, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to write template file to storage: {str(e)}"
-        )
-
-    # 5. Save metadata to database
+    # 4. Save metadata to database
     new_tpl = HtmlTemplate(
         name=name.strip(),
         version=version.strip(),

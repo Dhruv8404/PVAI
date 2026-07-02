@@ -63,7 +63,10 @@ class Settings(BaseSettings):
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/0"
 
     # File Storage configurations
-    STORAGE_TYPE: str = "local" # local or s3
+    STORAGE_TYPE: str = "cloudinary" # local or cloudinary
+    CLOUDINARY_CLOUD_NAME: str = "mapopioz"
+    CLOUDINARY_API_KEY: str = "576796838931328"
+    CLOUDINARY_API_SECRET: str = "OnYrRfUEMmuQWrv0YCUQvBnkD7Y"
     UPLOAD_DIR: str = "storage/uploads"
     TEMPLATES_DIR: str = "storage/templates"
     GENERATED_HTML_DIR: str = "storage/generated/html"
