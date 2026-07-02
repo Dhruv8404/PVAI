@@ -11,13 +11,14 @@ from app.core.security import get_password_hash
 from app.modules.auth.routes import router as auth_router
 from app.modules.users.routes import router as users_router
 from app.modules.templates.routes import router as templates_router
+from app.modules.templates.html_routes import admin_router as html_admin_router, public_router as html_public_router
 from app.modules.documents.routes import router as documents_router
 from app.modules.downloads.routes import router as downloads_router
 from app.modules.dashboard.routes import router as dashboard_router
 
 # Import models for seeding
 from app.modules.users.model import User, Role, Permission
-from app.modules.templates.model import DocumentTemplate
+from app.modules.templates.model import DocumentTemplate, HtmlTemplate
 
 
 # Lifespan manager to seed default models
@@ -91,6 +92,34 @@ async def lifespan(app: FastAPI):
             db.add_all([admin_user, standard_user])
             await db.commit()
             print("[SEEDER] Default Admin and User accounts created successfully")
+
+        # Seed default HTML template if table is empty
+        stmt_html = select(HtmlTemplate)
+        res_html = await db.execute(stmt_html)
+        html_tpls = res_html.scalars().all()
+        if not html_tpls:
+            import os
+            import shutil
+            os.makedirs(settings.TEMPLATES_DIR, exist_ok=True)
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+            default_src = os.path.join(app_dir, "templates", "drafting_studio.html")
+            default_dest = os.path.join(settings.TEMPLATES_DIR, "default_drafting_studio.html")
+            if os.path.exists(default_src):
+                shutil.copy2(default_src, default_dest)
+                default_tpl = HtmlTemplate(
+                    name="Default Drafting Studio",
+                    version="1.0.0",
+                    description="Standard bundled PV drafting studio template",
+                    html_file=default_dest,
+                    is_active=True,
+                    is_deleted=False,
+                    uploaded_by="system@company.com"
+                )
+                db.add(default_tpl)
+                await db.commit()
+                print("[SEEDER] Default HTML template seeded successfully")
+            else:
+                print(f"[SEEDER] ERROR: Default HTML template source not found at {default_src}")
             
     yield
     # Shutdown logic
@@ -111,6 +140,8 @@ setup_exception_handlers(app)
 app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(users_router, prefix=settings.API_V1_STR)
 app.include_router(templates_router, prefix=settings.API_V1_STR)
+app.include_router(html_admin_router, prefix=settings.API_V1_STR)
+app.include_router(html_public_router, prefix=settings.API_V1_STR)
 app.include_router(documents_router, prefix=settings.API_V1_STR)
 app.include_router(downloads_router, prefix=settings.API_V1_STR)
 app.include_router(dashboard_router, prefix=settings.API_V1_STR)

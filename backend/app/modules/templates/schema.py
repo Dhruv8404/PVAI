@@ -31,3 +31,23 @@ class TemplateResponse(TemplateBase):
 
     class Config:
         from_attributes = True
+
+
+class HtmlTemplateResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    version: str
+    description: Optional[str] = None
+    html_file: str
+    is_active: bool
+    uploaded_by: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class HtmlTemplateDetailResponse(HtmlTemplateResponse):
+    html_content: str
+

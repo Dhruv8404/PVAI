@@ -16,6 +16,7 @@ import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { UsersPage } from './features/users/UsersPage';
 import { GeneratorPage } from './features/generator/GeneratorPage';
+import { HtmlTemplatesPage } from './features/generator/HtmlTemplatesPage';
 import { HistoryPage } from './features/history/HistoryPage';
 
 // Administrative Access guard
@@ -86,6 +87,14 @@ export const App: React.FC = () => {
                   element={
                     <AdminRoute>
                       <UsersPage />
+                    </AdminRoute>
+                  } 
+                />
+                <Route 
+                  path="html-templates" 
+                  element={
+                    <AdminRoute>
+                      <HtmlTemplatesPage />
                     </AdminRoute>
                   } 
                 />

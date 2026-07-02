@@ -8,7 +8,8 @@ import {
   LogOut, 
   ChevronLeft, 
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  FileCode
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -37,6 +38,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed })
       name: 'Users Directory',
       path: '/users',
       icon: Users,
+      roles: ['Admin']
+    },
+    {
+      name: 'HTML Templates',
+      path: '/html-templates',
+      icon: FileCode,
       roles: ['Admin']
     },
     {

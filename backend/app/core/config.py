@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     # File Storage configurations
     STORAGE_TYPE: str = "local" # local or s3
     UPLOAD_DIR: str = "storage/uploads"
+    TEMPLATES_DIR: str = "storage/templates"
     GENERATED_HTML_DIR: str = "storage/generated/html"
     GENERATED_PDF_DIR: str = "storage/generated/pdf"
     
