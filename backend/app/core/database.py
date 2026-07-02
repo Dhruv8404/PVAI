@@ -9,7 +9,9 @@ engine = create_async_engine(
     echo=False,
     future=True,
     pool_size=20,
-    max_overflow=10
+    max_overflow=10,
+    pool_pre_ping=True,
+    pool_recycle=1800
 )
 
 # Async session maker
