@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -74,96 +75,13 @@ function buildOffLabel(psur,es,m){let rows=es.filter(r=>isOffLabelUseRow(r,m)),i
 function smqTerms(rows,needle){let set=new Set();(rows||[]).forEach(r=>r.forEach(c=>{let t=norm(c);if(t&&t!==needle&&!t.includes('smq')&&!['pt name','llt name','term'].includes(t))set.add(t)}));return set}function rowsByTerms(es,m,set,extra=[]){let ex=new Set(extra.map(norm));return es.filter(r=>{let pt=norm(getCell(r,m.esPt));return pt&&(set.has(pt)||ex.has(pt))})}function buildSmqBased(name,smqNeedle,defaultNo,psur,es,smq,m,extra=[]){let set=smqTerms(smq,smqNeedle),rows=rowsByTerms(es,m,set,extra),ids=unique(rows.map(r=>getCell(r,m.esId))),pt=[...countPT(rows,m).entries()].map(([p,n])=>`${p} (n=${n})`).join(', ');let para;if(!smq.length&&!extra.length)para=`Upload SMQ Terms file to generate ${name} section.`;else if(!ids.length)para=defaultNo;else para=`Cases related to ${name.toLowerCase()} were searched using applicable MedDRA SMQ/direct terms. A total of ${pad2(ids.length)} ${ids.length===1?'case was':'cases were'} received for ${name.toLowerCase()}${pt?' (PTs: '+pt+')':''} during the current period. The available case information did not indicate new significant safety information. Hence, no new significant safety information was received from review of ${ids.length===1?'this case':'these cases'}.`;return{title:name,meta:{total_cases:ids.length,total_events:rows.length,unlisted_events:rows.filter(r=>isUnlistedES(r,m)).length},paragraph:para}}
 async function runSpecialCircumstances(){try{let pf=$('sPsurCurrent').files[0],ef=$('sEsCurrent').files[0];if(!pf||!ef)throw Error('Upload PSUR Current and Event Summary Current.');setStatus('spStatus','Reading files...');let [pr,er,sr]=await Promise.all([readFile(pf),readFile(ef),readFile($('smqFile').files[0])]);let psur=dataRows(pr.rows),es=dataRows(er.rows),smq=sr.rows.filter(rowHasData),m=getMap();specialStore={elderly:buildElderly(psur,es,m),pediatric:buildPediatric(psur,es,m),fatal:buildFatal(psur,es,m),offlabel:buildOffLabel(psur,es,m),overdose:buildSmqBased('Overdose','overdose','No case of overdose was received in the current period.',psur,es,[],m,['overdose','intentional overdose','accidental overdose','prescribed overdose','chronic overdose','overmedication']),medication:buildSmqBased('Medication error','medication error','No case related to medication error was received in the current period.',psur,es,smq,m,['medication error','incorrect route of product administration']),pregnancy:buildSmqBased('Pregnancy and lactation','pregnancy','No case of drug exposure during pregnancy/lactation was received in the current period.',psur,es,smq,m,['exposure during pregnancy','maternal exposure during pregnancy','exposure during lactation']),abuse:buildSmqBased('Abuse/misuse','drug abuse','No case of drug abuse/misuse was received in the current period.',psur,es,smq,m,['drug abuse','drug misuse','substance abuse']),lack:buildSmqBased('Lack of efficacy','lack of efficacy','No case related to lack of efficacy was received in the current period.',psur,es,smq,m,['drug ineffective','lack of efficacy'])};Object.values(specialStore).forEach(x=>x.source=`PSUR: ${pr.sheet} • ES: ${er.sheet} • SMQ: ${sr.sheet}`);renderSpecial(activeSp);$('spCopy').disabled=false;setStatus('spStatus','Special Circumstances drafts generated.','ok')}catch(e){console.error(e);setStatus('spStatus',e.message||String(e),'err');throw e}}
 function renderSpecial(k){activeSp=k;document.querySelectorAll('.spTab').forEach(b=>b.classList.toggle('active',b.dataset.sp===k));let d=specialStore[k]||{title:k,meta:null,paragraph:'No draft generated yet.',source:'No output available'};$('spTitle').textContent=d.title;$('spOutput').innerHTML='<p>'+esc(d.paragraph)+'</p>';$('spSource').textContent=d.source||'No output available';$('spCurrent').textContent=d.title;$('spCases').textContent=d.meta?pad2(d.meta.total_cases):'-';$('spEvents').textContent=d.meta?String(d.meta.total_events):'-';$('spUnlisted').textContent=d.meta?pad2(d.meta.unlisted_events):'-'}document.querySelectorAll('.spTab').forEach(b=>b.onclick=()=>renderSpecial(b.dataset.sp));
-async function copyText(text){if(!clean(text))return alert('No output');try{await navigator.clipboard.writeText(text)}catch(e){let ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove()}}async function copyRichFromElement(id){let el=$(id); if(!el||!clean(el.innerText))return alert('No output');let html='<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Segoe UI,Arial,sans-serif;line-height:1.6}table{border-collapse:collapse;width:100%}td,th{border:1px solid #777;padding:8px}th{background:#edf2fb}</style></head><body>'+el.innerHTML+'</body></html>';let plain=el.innerText;try{if(navigator.clipboard&&window.ClipboardItem){await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([plain],{type:'text/plain'})})])}else throw Error('fallback')}catch(e){let range=document.createRange();range.selectNodeContents(el);let sel=window.getSelection();    sel.removeAllRanges();
-    sel.addRange(range);
-    try {
-      document.execCommand('copy');
-      alert('Copied to clipboard!');
-    } catch (err) {
-      alert('Copy failed.');
-    }
-    sel.removeAllRanges();
-  }
-}
-
-$('runAll').onclick = async () => {
-  try {
-    setStatus('allStatus', 'Generating all...');
-    await Promise.all([runSection(), runDme(), runSpecialCircumstances()]);
-    $('copyAuditBtn').disabled = false;
-    $('downloadAllBtn').disabled = false;
-    setStatus('allStatus', 'All sections generated successfully.', 'ok');
-  } catch(e) {
-    setStatus('allStatus', 'Generation failed: ' + e.message, 'err');
-  }
-};
-
-$('validateBtn').onclick = async () => {
-  try {
-    setStatus('allStatus', 'Validating...');
-    let pc=$('sPsurCurrent').files[0], ec=$('sEsCurrent').files[0];
-    if(!pc || !ec) throw Error('Upload PSUR Current and Event Summary Current.');
-    let [pcr, ecr] = await Promise.all([readFile(pc), readFile(ec)]);
-    let map = getMap();
-    let pHeader = findHeaderRowIndex(pcr.rows);
-    let eHeader = findHeaderRowIndex(ecr.rows);
-    let audit = [];
-    audit.push(`PSUR Current: ${pc.name} - Header row: ${pHeader >= 0 ? pHeader+1 : 'None'}`);
-    audit.push(`Event Summary Current: ${ec.name} - Header row: ${eHeader >= 0 ? eHeader+1 : 'None'}`);
-    $('auditBox').innerHTML = audit.map(x => `<div>${esc(x)}</div>`).join('');
-    $('copyAuditBtn').disabled = false;
-    setStatus('allStatus', 'Validation complete.', 'ok');
-  } catch(e) {
-    setStatus('allStatus', 'Validation failed: ' + e.message, 'err');
-  }
-};
-
-$('copyAuditBtn').onclick = () => {
-  copyText($('auditBox').innerText);
-};
-
-$('downloadAllBtn').onclick = () => {
-  let zipText = `--- SECTION 01/02 ---\n${$('sOutput').innerText}\n\n--- DME ---\n${$('dmeOutput').innerText}\n\n--- NON-DME ---\n${$('qPara').value}\n\n${$('qPt').value}`;
-  let blob = new Blob([zipText], {type: 'text/plain'});
-  let url = URL.createObjectURL(blob);
-  let link = document.createElement('a');
-  link.href = url;
-  link.download = 'pv_studio_drafts.txt';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-
-$('allClear').onclick = () => {
-  $('sDrug').value = '';
-  $('sClient').value = 'Accord';
-  $('sPrepared').value = '';
-  $('sFrom').value = '01-Jan-2026';
-  $('sTo').value = '31-Mar-2026';
-  $('sCumFrom').value = '';
-  $('sCumTo').value = '31-Mar-2026';
-  $('sPsurCurrent').value = '';
-  $('sPsurCum').value = '';
-  $('sEsCurrent').value = '';
-  $('sEsCum').value = '';
-  $('qFile').value = '';
-  $('smqFile').value = '';
-  $('auditBox').innerHTML = 'No validation performed.';
-  setStatus('allStatus', 'Cleared.');
-};
-
-$('sRun').onclick = runSection;
-$('sCopy').onclick = () => copyRichFromElement('sOutput');
-
-$('dmeRun').onclick = runDme;
-$('dmeCopy').onclick = () => copyRichFromElement('dmeOutput');
-
-$('qRun').onclick = runNonDme;
-$('qCopyPara').onclick = () => copyText($('qPara').value);
-$('qCopyPt').onclick = () => copyText($('qPt').value);
-
-$('spRun').onclick = runSpecialCircumstances;
-$('spCopy').onclick = () => copyRichFromElement('spOutput');
+async function copyText(text){if(!clean(text))return alert('No output');try{await navigator.clipboard.writeText(text)}catch(e){let ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove()}}async function copyRichFromElement(id){let el=$(id); if(!el||!clean(el.innerText))return alert('No output');let html='<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Segoe UI,Arial,sans-serif;line-height:1.6}table{border-collapse:collapse;width:100%}td,th{border:1px solid #777;padding:8px}th{background:#edf2fb}</style></head><body>'+el.innerHTML+'</body></html>';let plain=el.innerText;try{if(navigator.clipboard&&window.ClipboardItem){await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([plain],{type:'text/plain'})})])}else throw Error('fallback')}catch(e){let range=document.createRange();range.selectNodeContents(el);let sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);document.execCommand('copy');sel.removeAllRanges()}}
+function auditLine(label,r,type){if(!r||!r.rows)return`${label}: not uploaded`;let h=type?findHeader(r.rows,type):findHeaderRowIndex(r.rows);let rows=h>=0?r.rows.slice(h+1).filter(rowHasData).length:Math.max(0,(r.rows||[]).length-11);let names=[];if(h>=0)names=(r.rows[h]||[]).map(clean).filter(Boolean).slice(0,12);return`${label}: sheet=${r.sheet}; header row=${h>=0?h+1:'not detected'}; data rows=${rows}; columns=${names.join(', ')||'not detected'}`}async function validateFiles(showOk=true){let lines=[];lines.push('PV Integrated Signal Drafting Studio - Validation & Audit Summary');lines.push('Generated: '+new Date().toLocaleString());lines.push('Product: '+(clean($('sDrug').value)||'not entered'));lines.push('Period: '+[$('sFrom').value,$('sTo').value].map(clean).filter(Boolean).join(' to '));let files=[['PSUR Current',$('sPsurCurrent').files[0],'psur'],['PSUR Cumulative',$('sPsurCum').files[0],'psur'],['ES Current',$('sEsCurrent').files[0],'es'],['ES Cumulative',$('sEsCum').files[0],'es'],['Quantitative',$('qFile').files[0],null],['SMQ',$('smqFile').files[0],null]];for(const [label,file,type] of files){if(!file){lines.push(label+': not uploaded');continue}try{let r=await readFile(file);lines.push(auditLine(label,r,type));if(r.zero)lines.push('  warning: header detected but zero data rows.')}catch(e){lines.push(label+': ERROR - '+(e.message||e))}}lines.push('Logic: Common uploads are reused by Section 01/02, DME, Non-DME, and Special Circumstances.');$('auditBox').textContent=lines.join('\n');$('copyAuditBtn').disabled=false;if(showOk)setStatus('allStatus','Validation completed. Review audit summary before final use.','ok');return lines.join('\n')}
+function downloadAll(){let parts=[];if(sLastHtml)parts.push('SECTION 01/02\n'+$('sOutput').innerText);if(dmeLastHtml)parts.push('DME\n'+$('dmeOutput').innerText);if(qLastHtml)parts.push('NON-DME\n'+$('qPara').value+'\n\n'+$('qPt').value);Object.keys(specialStore).forEach(k=>parts.push(String(specialStore[k].title||k).toUpperCase()+'\n'+(specialStore[k].paragraph||'')));let blob=new Blob([parts.join('\n\n---\n\n')],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='PV_Integrated_Drafts_Common_Upload_v1_0.txt';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+async function runAllAvailable(){let notes=[];setStatus('allStatus','Generating available sections...');try{await validateFiles(false);notes.push('Validation completed.')}catch(e){notes.push('Validation warning: '+(e.message||e))}if($('sPsurCurrent').files[0]&&$('sEsCurrent').files[0]){try{await runSection();notes.push('Section 01/02 generated.')}catch(e){notes.push('Section 01/02 error: '+(e.message||e))}try{await runDme();notes.push('DME generated.')}catch(e){notes.push('DME error: '+(e.message||e))}try{await runSpecialCircumstances();notes.push('Special Circumstances generated.')}catch(e){notes.push('Special Circumstances error: '+(e.message||e))}}else notes.push('Section/DME/Special skipped: PSUR Current and ES Current required.');if($('qFile').files[0]){try{await runNonDme();notes.push('Non-DME generated.')}catch(e){notes.push('Non-DME error: '+(e.message||e))}}else notes.push('Non-DME skipped: quantitative sheet not uploaded.');$('downloadAllBtn').disabled=false;setStatus('allStatus',notes.join('\n'),'ok')}
+function clearAllCommon(){['sDrug','sPrepared','sCumFrom','sPsurCurrent','sPsurCum','sEsCurrent','sEsCum','qFile','smqFile'].forEach(id=>{if($(id))$(id).value=''});$('sOutput').textContent='Draft will appear here.';$('dmeOutput').textContent='Upload common files and click Generate DME.';$('qPara').value='';$('qPt').value='';$('spOutput').textContent='Upload files and click Generate Special Circumstances.';specialStore={};sLastHtml=dmeLastHtml=qLastHtml='';['sCopy','dmeCopy','qCopyPara','qCopyPt','spCopy','copyAuditBtn','downloadAllBtn'].forEach(id=>$(id).disabled=true);['sMethod','sCases','sEvents','sIcsr','dmeAll','dmeUnlisted','qTotal','qCurrent','spCases','spEvents','spUnlisted'].forEach(id=>$(id).textContent='-');$('auditBox').textContent='No validation performed.';setStatus('allStatus','Ready.');setStatus('sStatus','Ready.');setStatus('dmeStatus','Ready.');setStatus('qStatus','Ready.');setStatus('spStatus','Ready.')}
+$('sRun').onclick=runSection;$('sCopy').onclick=()=>copyRichFromElement('sOutput');$('dmeRun').onclick=runDme;$('dmeCopy').onclick=()=>copyRichFromElement('dmeOutput');$('qRun').onclick=runNonDme;$('qCopyPara').onclick=()=>copyText($('qPara').value);$('qCopyPt').onclick=()=>copyText($('qPt').value);$('spRun').onclick=runSpecialCircumstances;$('spCopy').onclick=()=>copyText((specialStore[activeSp]||{}).paragraph||$('spOutput').innerText);$('runAll').onclick=runAllAvailable;$('validateBtn').onclick=()=>validateFiles(true);$('copyAuditBtn').onclick=()=>copyText($('auditBox').innerText);$('downloadAllBtn').onclick=downloadAll;$('allClear').onclick=clearAllCommon;
+window.addEventListener('error',e=>{try{$('auditBox').textContent+='\nRuntime error: '+e.message}catch(_){}});window.addEventListener('unhandledrejection',e=>{try{$('auditBox').textContent+='\nUnhandled error: '+(e.reason&&e.reason.message?e.reason.message:e.reason)}catch(_){}});
 </script>
 </body>
 </html>
