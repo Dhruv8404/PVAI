@@ -56,7 +56,8 @@ export const HtmlTemplatesPage: React.FC = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem("pv_token");
-      const res = await fetch(`${API_BASE_URL}/admin/templates`, {
+      const specUrl = API_BASE_URL.replace("/api/v1", "/api");
+      const res = await fetch(`${specUrl}/templates/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error("Failed to fetch templates.");
@@ -118,7 +119,8 @@ export const HtmlTemplatesPage: React.FC = () => {
       formData.append("version", version.trim());
       formData.append("description", description.trim());
 
-      const res = await fetch(`${API_BASE_URL}/admin/templates/upload`, {
+      const specUrl = API_BASE_URL.replace("/api/v1", "/api");
+      const res = await fetch(`${specUrl}/templates/upload/`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData
@@ -147,7 +149,8 @@ export const HtmlTemplatesPage: React.FC = () => {
   const handleActivate = async (id: string, name: string) => {
     try {
       const token = localStorage.getItem("pv_token");
-      const res = await fetch(`${API_BASE_URL}/admin/templates/${id}/activate`, {
+      const specUrl = API_BASE_URL.replace("/api/v1", "/api");
+      const res = await fetch(`${specUrl}/templates/${id}/activate/`, {
         method: "PUT",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -166,7 +169,8 @@ export const HtmlTemplatesPage: React.FC = () => {
   const handleDeactivate = async (id: string, name: string) => {
     try {
       const token = localStorage.getItem("pv_token");
-      const res = await fetch(`${API_BASE_URL}/admin/templates/${id}/deactivate`, {
+      const specUrl = API_BASE_URL.replace("/api/v1", "/api");
+      const res = await fetch(`${specUrl}/templates/${id}/deactivate/`, {
         method: "PUT",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -191,7 +195,8 @@ export const HtmlTemplatesPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem("pv_token");
-      const res = await fetch(`${API_BASE_URL}/admin/templates/${id}`, {
+      const specUrl = API_BASE_URL.replace("/api/v1", "/api");
+      const res = await fetch(`${specUrl}/templates/${id}/`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -210,7 +215,8 @@ export const HtmlTemplatesPage: React.FC = () => {
   const handlePreview = async (id: string, name: string) => {
     try {
       const token = localStorage.getItem("pv_token");
-      const res = await fetch(`${API_BASE_URL}/admin/templates/${id}`, {
+      const specUrl = API_BASE_URL.replace("/api/v1", "/api");
+      const res = await fetch(`${specUrl}/templates/${id}/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();
@@ -243,7 +249,7 @@ export const HtmlTemplatesPage: React.FC = () => {
   }, [previewBlobUrl]);
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6">
       {/* Back Button */}
       <div className="flex items-center">
         <Button 
@@ -259,7 +265,7 @@ export const HtmlTemplatesPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-zinc-50 tracking-tight">
+          <h1 className="text-xl font-bold text-slate-900 dark:text-zinc-50 leading-tight">
             HTML Template Management
           </h1>
           <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 font-medium">

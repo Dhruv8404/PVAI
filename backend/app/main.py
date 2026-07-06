@@ -11,7 +11,7 @@ from app.core.security import get_password_hash
 from app.modules.auth.routes import router as auth_router
 from app.modules.users.routes import router as users_router
 from app.modules.templates.routes import router as templates_router
-from app.modules.templates.html_routes import admin_router as html_admin_router, public_router as html_public_router
+from app.modules.templates.html_routes import admin_router as html_admin_router, public_router as html_public_router, spec_router as html_spec_router
 from app.modules.documents.routes import router as documents_router
 from app.modules.downloads.routes import router as downloads_router
 from app.modules.dashboard.routes import router as dashboard_router
@@ -142,6 +142,7 @@ app.include_router(users_router, prefix=settings.API_V1_STR)
 app.include_router(templates_router, prefix=settings.API_V1_STR)
 app.include_router(html_admin_router, prefix=settings.API_V1_STR)
 app.include_router(html_public_router, prefix=settings.API_V1_STR)
+app.include_router(html_spec_router, prefix="/api")
 app.include_router(documents_router, prefix=settings.API_V1_STR)
 app.include_router(downloads_router, prefix=settings.API_V1_STR)
 app.include_router(dashboard_router, prefix=settings.API_V1_STR)

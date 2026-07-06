@@ -79,3 +79,8 @@ class User(Base):
     documents: Mapped[list["GeneratedDocument"]] = relationship(
         "GeneratedDocument", back_populates="user", lazy="selectin"
     )
+
+    @property
+    def documents_generated(self) -> int:
+        return sum(1 for doc in self.documents if doc.status == "Success")
+

@@ -325,3 +325,74 @@ async def get_current_active_template(
         message="Current active template fetched successfully",
         data=response_data
     )
+
+
+# Spec Router to match exact /api/templates/ paths requested in requirements
+spec_router = APIRouter(prefix="/templates", tags=["Spec Templates"])
+
+@spec_router.post("/upload/", response_model=ApiResponse[HtmlTemplateResponse], dependencies=[Depends(require_admin)])
+@spec_router.post("/upload", response_model=ApiResponse[HtmlTemplateResponse], dependencies=[Depends(require_admin)])
+async def spec_upload_html_template(
+    file: UploadFile = File(...),
+    name: str = Form(...),
+    version: str = Form(...),
+    description: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return await upload_html_template(file, name, version, description, db, current_user)
+
+
+@spec_router.get("/", response_model=ApiResponse[List[HtmlTemplateResponse]])
+@spec_router.get("", response_model=ApiResponse[List[HtmlTemplateResponse]])
+async def spec_list_html_templates(
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    return await list_html_templates(db)
+
+
+@spec_router.get("/active/", response_model=ApiResponse[HtmlTemplateDetailResponse])
+@spec_router.get("/active", response_model=ApiResponse[HtmlTemplateDetailResponse])
+async def spec_get_active_template(
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    return await get_current_active_template(db, _current_user)
+
+
+@spec_router.put("/{id}/activate/", response_model=ApiResponse[HtmlTemplateResponse], dependencies=[Depends(require_admin)])
+@spec_router.put("/{id}/activate", response_model=ApiResponse[HtmlTemplateResponse], dependencies=[Depends(require_admin)])
+async def spec_activate_template(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    return await activate_html_template(id, db)
+
+
+@spec_router.put("/{id}/deactivate/", response_model=ApiResponse[HtmlTemplateResponse], dependencies=[Depends(require_admin)])
+@spec_router.put("/{id}/deactivate", response_model=ApiResponse[HtmlTemplateResponse], dependencies=[Depends(require_admin)])
+async def spec_deactivate_template(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    return await deactivate_html_template(id, db)
+
+
+@spec_router.get("/{id}/", response_model=ApiResponse[HtmlTemplateDetailResponse], dependencies=[Depends(require_admin)])
+@spec_router.get("/{id}", response_model=ApiResponse[HtmlTemplateDetailResponse], dependencies=[Depends(require_admin)])
+async def spec_get_template_detail(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    return await get_html_template_detail(id, db)
+
+
+@spec_router.delete("/{id}/", response_model=ApiResponse[dict], dependencies=[Depends(require_admin)])
+@spec_router.delete("/{id}", response_model=ApiResponse[dict], dependencies=[Depends(require_admin)])
+async def spec_delete_template(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    return await delete_html_template(id, db)
+

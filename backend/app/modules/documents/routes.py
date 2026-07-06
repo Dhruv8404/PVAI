@@ -95,3 +95,39 @@ async def delete_document(
         message="Document record and associated files removed from platform database",
         data={}
     )
+
+
+@router.post("/log-generation", response_model=ApiResponse[DocumentResponse])
+async def log_generation(
+    template_id: uuid.UUID = Form(..., description="Document template UUID"),
+    excel_file_name: str = Form("dynamic_drafting_studio.xlsx", description="Name of the file parsed"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    doc = await document_service.log_client_generation(
+        db,
+        user=current_user,
+        template_id=template_id,
+        excel_file_name=excel_file_name
+    )
+    
+    resp_data = DocumentResponse.model_validate(doc)
+    resp_data.created_by_name = current_user.name
+    
+    # Resolve the HtmlTemplate name to display it in history
+    from sqlalchemy import select
+    from app.modules.templates.model import HtmlTemplate
+    stmt = select(HtmlTemplate).where(HtmlTemplate.id == template_id)
+    res = await db.execute(stmt)
+    html_tpl = res.scalar_one_or_none()
+    if html_tpl:
+        resp_data.template_name = html_tpl.name
+    else:
+        resp_data.template_name = "HTML Drafting Studio"
+
+    return ApiResponse(
+        success=True,
+        message="Client-side report generation logged and token deducted successfully",
+        data=resp_data
+    )
+

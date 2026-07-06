@@ -81,7 +81,7 @@ export const ProtectedLayout: React.FC = () => {
 
         {/* Dynamic Page Router Outlet */}
         <main className="flex-1 p-6 overflow-x-hidden">
-          <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
+          <div className="w-full max-w-7xl xl:max-w-[1440px] 2xl:max-w-[1600px] mx-auto space-y-6 animate-fade-in">
             <Outlet />
           </div>
         </main>

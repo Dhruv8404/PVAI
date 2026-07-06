@@ -127,13 +127,77 @@ class DocumentService:
         if not doc:
             raise NotFoundException("Document record not found")
             
-        # Delete files from storage
-        storage = get_storage()
-        await storage.delete_file(doc.html_path)
-        if doc.pdf_path:
-            await storage.delete_file(doc.pdf_path)
+        # Delete files from storage if not client-side logs
+        if doc.html_path and doc.html_path != "client_side_draft":
+            try:
+                storage = get_storage()
+                await storage.delete_file(doc.html_path)
+            except Exception:
+                pass
+        if doc.pdf_path and doc.pdf_path != "client_side_draft":
+            try:
+                storage = get_storage()
+                await storage.delete_file(doc.pdf_path)
+            except Exception:
+                pass
 
         return await document_repository.remove(db, id=doc_id)
+
+    async def log_client_generation(
+        self, db: AsyncSession, *, user: User, template_id: uuid.UUID, excel_file_name: str
+    ) -> GeneratedDocument:
+        from app.modules.templates.model import HtmlTemplate
+
+        # Debug print
+        print(f"[DEBUG_TOKEN] Received template_id: {template_id} (Type: {type(template_id)})")
+        
+        # List all templates in DB for debugging
+        all_stmt = select(HtmlTemplate)
+        all_res = await db.execute(all_stmt)
+        all_tpls = all_res.scalars().all()
+        for t in all_tpls:
+            print(f"[DEBUG_TOKEN] DB Template: ID={t.id}, Name='{t.name}', is_active={t.is_active}, is_deleted={t.is_deleted}")
+
+        # Resolve HTML template
+        stmt = select(HtmlTemplate).where(HtmlTemplate.id == template_id, HtmlTemplate.is_deleted == False)
+        res = await db.execute(stmt)
+        tpl = res.scalar_one_or_none()
+        if not tpl:
+            raise NotFoundException("HTML template not found")
+
+        user_roles = [r.name for r in user.roles]
+
+        # Enforce Report Generation Limits for standard Users
+        if "Admin" not in user_roles:
+            count_stmt = select(func.count(GeneratedDocument.id)).where(
+                and_(
+                    GeneratedDocument.user_id == user.id,
+                    GeneratedDocument.status == "Success"
+                )
+            )
+            count_res = await db.execute(count_stmt)
+            generated_count = count_res.scalar() or 0
+            if generated_count >= user.report_limit:
+                raise ForbiddenException(
+                    f"You have reached your report generation quota limit of {user.report_limit} reports. "
+                    "Please contact an administrator to increase your allocation limit."
+                )
+
+        # Log entry to DB (template_id set to None to avoid foreign key violation on document_templates)
+        doc_in_data = {
+            "user_id": user.id,
+            "template_id": None,
+            "name": f"{tpl.name.upper()}_Draft_{new_date_label()}",
+            "excel_file_name": excel_file_name,
+            "html_path": "client_side_draft",
+            "pdf_path": None,
+            "status": "Success",
+            "execution_time_ms": 0
+        }
+        
+        doc = await document_repository.create(db, obj_in_data=doc_in_data)
+        return doc
+
 
 
 document_service = DocumentService()
