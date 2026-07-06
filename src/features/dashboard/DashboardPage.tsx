@@ -47,7 +47,9 @@ export const DashboardPage: React.FC = () => {
             inactiveUsers: m.inactive_users,
             genToday: m.gen_today,
             genMonth: m.gen_month,
-            totalDownloads: m.total_downloads
+            totalDownloads: m.total_downloads,
+            mostUsedTemplate: m.most_used_template,
+            topUser: m.top_user
           });
           
           const mappedLogs = recent_activities.map((a: any) => ({
@@ -127,7 +129,7 @@ export const DashboardPage: React.FC = () => {
 
       {/* Grid of Stat Cards */}
       {metrics && user?.role === 'Admin' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <StatCard 
             title="Total Users" 
             value={metrics.totalUsers} 
@@ -152,6 +154,18 @@ export const DashboardPage: React.FC = () => {
             value={metrics.totalDownloads} 
             icon={<Download className="h-5 w-5" />} 
             trend={{ value: '62% download rate', direction: 'neutral' }}
+          />
+          <StatCard 
+            title="Most Used Template" 
+            value={metrics.mostUsedTemplate || 'None'} 
+            icon={<Layers className="h-5 w-5" />} 
+            description="Top active dynamic template"
+          />
+          <StatCard 
+            title="Top Platform User" 
+            value={metrics.topUser || 'None'} 
+            icon={<Activity className="h-5 w-5" />} 
+            description="User with most generations"
           />
         </div>
       )}

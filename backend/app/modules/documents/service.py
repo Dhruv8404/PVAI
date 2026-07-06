@@ -10,6 +10,7 @@ from app.modules.documents.model import GeneratedDocument
 from app.modules.documents.repository import document_repository
 from app.modules.documents.generator import get_generator_strategy
 from app.modules.templates.repository import template_repository
+from app.core.config import settings
 from app.modules.users.model import User
 
 
@@ -107,8 +108,11 @@ class DocumentService:
     ) -> List[GeneratedDocument]:
         user_roles = [r.name for r in user.roles]
         if "Admin" in user_roles:
-            return await document_repository.get_all_with_relations(db)
-        return await document_repository.get_by_user(db, user.id)
+            docs = await document_repository.get_all_with_relations(db)
+        else:
+            docs = await document_repository.get_by_user(db, user.id)
+        # Only return successful generation reports
+        return [d for d in docs if d.status == "Success"]
 
     async def get_document(self, db: AsyncSession, doc_id: uuid.UUID, user: User) -> GeneratedDocument:
         doc = await document_repository.get(db, doc_id)
@@ -144,20 +148,24 @@ class DocumentService:
         return await document_repository.remove(db, id=doc_id)
 
     async def log_client_generation(
-        self, db: AsyncSession, *, user: User, template_id: uuid.UUID, excel_file_name: str
+        self,
+        db: AsyncSession,
+        *,
+        user: User,
+        template_id: uuid.UUID,
+        excel_file_name: str,
+        report_type: str = "PSUR",
+        report_content: str = "",
+        status: str = "Success",
+        failed_reason: str = None,
+        browser: str = None,
+        ip_address: str = None
     ) -> GeneratedDocument:
         from app.modules.templates.model import HtmlTemplate
 
         # Debug print
         print(f"[DEBUG_TOKEN] Received template_id: {template_id} (Type: {type(template_id)})")
         
-        # List all templates in DB for debugging
-        all_stmt = select(HtmlTemplate)
-        all_res = await db.execute(all_stmt)
-        all_tpls = all_res.scalars().all()
-        for t in all_tpls:
-            print(f"[DEBUG_TOKEN] DB Template: ID={t.id}, Name='{t.name}', is_active={t.is_active}, is_deleted={t.is_deleted}")
-
         # Resolve HTML template
         stmt = select(HtmlTemplate).where(HtmlTemplate.id == template_id, HtmlTemplate.is_deleted == False)
         res = await db.execute(stmt)
@@ -167,8 +175,8 @@ class DocumentService:
 
         user_roles = [r.name for r in user.roles]
 
-        # Enforce Report Generation Limits for standard Users
-        if "Admin" not in user_roles:
+        # Enforce Report Generation Limits for standard Users (only on Success!)
+        if status == "Success" and "Admin" not in user_roles:
             count_stmt = select(func.count(GeneratedDocument.id)).where(
                 and_(
                     GeneratedDocument.user_id == user.id,
@@ -183,19 +191,96 @@ class DocumentService:
                     "Please contact an administrator to increase your allocation limit."
                 )
 
+        # Upload template compilation file if successful and content is present
+        saved_html_path = "client_side_draft"
+        file_size = 0
+
+        if status == "Success" and report_content:
+            file_bytes = report_content.encode("utf-8")
+            file_size = len(file_bytes)
+            
+            # Check if active storage is Cloudinary
+            if settings.STORAGE_TYPE == "cloudinary":
+                import cloudinary
+                import cloudinary.uploader
+                
+                try:
+                    cloudinary.config(
+                        cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+                        api_key=settings.CLOUDINARY_API_KEY,
+                        api_secret=settings.CLOUDINARY_API_SECRET,
+                        secure=True
+                    )
+                    upload_res = cloudinary.uploader.upload(
+                        file_bytes,
+                        resource_type="raw",
+                        folder="pv_generated_reports",
+                        public_id=f"report_{uuid.uuid4().hex}.html"
+                    )
+                    saved_html_path = upload_res.get("secure_url") or "client_side_draft"
+                except Exception as e:
+                    # Fallback to local file storage
+                    storage = get_storage()
+                    html_subpath = f"generated/html/{uuid.uuid4()}_client_report.html"
+                    saved_html_path = await storage.save_file(file_bytes, html_subpath)
+            else:
+                storage = get_storage()
+                html_subpath = f"generated/html/{uuid.uuid4()}_client_report.html"
+                saved_html_path = await storage.save_file(file_bytes, html_subpath)
+
+        # If report generation fails, do NOT create a History record.
+        if status != "Success":
+            return GeneratedDocument(
+                id=uuid.uuid4(),
+                user_id=user.id,
+                template_id=None,
+                name=f"{tpl.name.upper()}_{report_type}_Report_{new_date_label()}",
+                excel_file_name=excel_file_name,
+                html_path=saved_html_path,
+                pdf_path=None,
+                status=status,
+                execution_time_ms=0,
+                template_version=tpl.version if tpl.version else "1.0.0",
+                report_type=report_type,
+                generated_file_size=file_size,
+                download_count=0,
+                browser=browser,
+                ip_address=ip_address,
+                failed_reason=failed_reason
+            )
+
         # Log entry to DB (template_id set to None to avoid foreign key violation on document_templates)
         doc_in_data = {
             "user_id": user.id,
             "template_id": None,
-            "name": f"{tpl.name.upper()}_Draft_{new_date_label()}",
+            "name": f"{tpl.name.upper()}_{report_type}_Report_{new_date_label()}",
             "excel_file_name": excel_file_name,
-            "html_path": "client_side_draft",
+            "html_path": saved_html_path,
             "pdf_path": None,
-            "status": "Success",
-            "execution_time_ms": 0
+            "status": status,
+            "execution_time_ms": 0,
+            "template_version": tpl.version if tpl.version else "1.0.0",
+            "report_type": report_type,
+            "generated_file_size": file_size,
+            "download_count": 0,
+            "browser": browser,
+            "ip_address": ip_address,
+            "failed_reason": failed_reason
         }
         
         doc = await document_repository.create(db, obj_in_data=doc_in_data)
+
+        # Create audit logs activity on success
+        if status == "Success":
+            from app.modules.dashboard.service import dashboard_service
+            activity_details = f"{user.name} generated {report_type} Report using Template v{tpl.version if tpl.version else '1.0.0'}"
+            await dashboard_service.log_activity(
+                db,
+                user_id=str(user.id),
+                action="REPORT_GENERATED",
+                details=activity_details
+            )
+
         return doc
 
 

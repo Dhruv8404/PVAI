@@ -10,6 +10,8 @@ class MetricCard(BaseModel):
     gen_today: int
     gen_month: int
     total_downloads: int
+    most_used_template: Optional[str] = None
+    top_user: Optional[str] = None
 
 
 class ActivityLogResponse(BaseModel):

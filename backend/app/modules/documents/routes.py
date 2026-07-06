@@ -1,6 +1,6 @@
 import uuid
 from typing import List
-from fastapi import APIRouter, Depends, UploadFile, File, Form
+from fastapi import APIRouter, Depends, UploadFile, File, Form, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, RoleRequirement
@@ -99,16 +99,31 @@ async def delete_document(
 
 @router.post("/log-generation", response_model=ApiResponse[DocumentResponse])
 async def log_generation(
+    request: Request,
     template_id: uuid.UUID = Form(..., description="Document template UUID"),
     excel_file_name: str = Form("dynamic_drafting_studio.xlsx", description="Name of the file parsed"),
+    report_type: str = Form("PSUR", description="Type of report generated"),
+    report_content: str = Form("", description="HTML template compilation text"),
+    status: str = Form("Success", description="Status of the generation"),
+    failed_reason: str = Form(None, description="Optional failed error details"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    user_agent = request.headers.get("user-agent", "unknown")
+    client_ip = request.client.host if request and request.client else "unknown"
+    print(f"[DEBUG_FORM] Received template_id: {template_id}, excel_file_name: {excel_file_name}, status: {status}, report_content_length: {len(report_content) if report_content else 0}")
+
     doc = await document_service.log_client_generation(
         db,
         user=current_user,
         template_id=template_id,
-        excel_file_name=excel_file_name
+        excel_file_name=excel_file_name,
+        report_type=report_type,
+        report_content=report_content,
+        status=status,
+        failed_reason=failed_reason,
+        browser=user_agent,
+        ip_address=client_ip
     )
     
     resp_data = DocumentResponse.model_validate(doc)
@@ -122,8 +137,10 @@ async def log_generation(
     html_tpl = res.scalar_one_or_none()
     if html_tpl:
         resp_data.template_name = html_tpl.name
+        resp_data.template_version = html_tpl.version
     else:
         resp_data.template_name = "HTML Drafting Studio"
+        resp_data.template_version = "1.0.0"
 
     return ApiResponse(
         success=True,

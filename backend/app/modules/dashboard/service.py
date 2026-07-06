@@ -1,11 +1,12 @@
 from datetime import datetime, UTC, timedelta
 from typing import List
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.users.model import User
 from app.modules.documents.model import GeneratedDocument
 from app.modules.downloads.model import DownloadLog
 from app.modules.dashboard.model import ActivityLog
+from app.modules.templates.model import DocumentTemplate, HtmlTemplate
 from app.modules.dashboard.schema import (
     DashboardFullResponse,
     MetricCard,
@@ -41,13 +42,46 @@ class DashboardService:
             gen_month = (await db.execute(d_month_stmt)).scalar() or 0
             total_downloads = (await db.execute(dl_total_stmt)).scalar() or 0
 
+            # Calculate most used template
+            most_used_stmt = select(
+                GeneratedDocument.report_type,
+                func.count(GeneratedDocument.id).label("cnt")
+            ).where(GeneratedDocument.status == "Success").group_by(GeneratedDocument.report_type).order_by(desc("cnt")).limit(1)
+            most_used_res = await db.execute(most_used_stmt)
+            most_used_row = most_used_res.first()
+            
+            if not most_used_row:
+                most_used_stmt = select(
+                    DocumentTemplate.name,
+                    func.count(GeneratedDocument.id).label("cnt")
+                ).join(
+                    GeneratedDocument, GeneratedDocument.template_id == DocumentTemplate.id
+                ).group_by(DocumentTemplate.name).order_by(desc("cnt")).limit(1)
+                most_used_res = await db.execute(most_used_stmt)
+                most_used_row = most_used_res.first()
+                
+            most_used_template = f"{most_used_row[0]} ({most_used_row[1]})" if most_used_row else "None"
+
+            # Calculate top user
+            top_user_stmt = select(
+                User.name,
+                func.count(GeneratedDocument.id).label("cnt")
+            ).join(
+                GeneratedDocument, GeneratedDocument.user_id == User.id
+            ).where(GeneratedDocument.status == "Success").group_by(User.id).order_by(desc("cnt")).limit(1)
+            top_user_res = await db.execute(top_user_stmt)
+            top_user_row = top_user_res.first()
+            top_user = f"{top_user_row[0]} ({top_user_row[1]} reports)" if top_user_row else "None"
+
             metrics = MetricCard(
                 total_users=total_users,
                 active_users=active_users,
                 inactive_users=inactive_users,
                 gen_today=gen_today,
                 gen_month=gen_month,
-                total_downloads=total_downloads
+                total_downloads=total_downloads,
+                most_used_template=most_used_template,
+                top_user=top_user
             )
 
             # 2. Admin Recent Activities
@@ -113,7 +147,9 @@ class DashboardService:
                 inactive_users=0,
                 gen_today=gen_today,
                 gen_month=gen_month,
-                total_downloads=total_downloads
+                total_downloads=total_downloads,
+                most_used_template=None,
+                top_user=None
             )
 
             # 2. User-specific Activities

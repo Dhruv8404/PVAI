@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from sqlalchemy import text
 from sqlalchemy.future import select
 from app.core.config import settings
 from app.core.database import Base, engine, SessionLocal
@@ -27,6 +28,25 @@ async def lifespan(app: FastAPI):
     # 1. Create tables in development (In production, use Alembic migrations)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+        # Ensure new generated_documents columns exist for PostgreSQL/Neon DB migrations
+        for col_name, col_type in [
+            ("template_version", "VARCHAR(50) DEFAULT '1.0.0'"),
+            ("report_type", "VARCHAR(50) DEFAULT 'PSUR'"),
+            ("generated_file_size", "INTEGER DEFAULT 0"),
+            ("download_count", "INTEGER DEFAULT 0"),
+            ("last_downloaded_at", "TIMESTAMP WITH TIME ZONE"),
+            ("browser", "VARCHAR(255)"),
+            ("ip_address", "VARCHAR(50)"),
+            ("failed_reason", "VARCHAR(500)"),
+        ]:
+            try:
+                await conn.execute(
+                    text(f"ALTER TABLE generated_documents ADD COLUMN IF NOT EXISTS {col_name} {col_type}")
+                )
+            except Exception:
+                # Fallback / ignore error if column already exists or SQLite dialect compatibility
+                pass
 
     # 2. Seed default roles and admin accounts
     async with SessionLocal() as db:

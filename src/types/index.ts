@@ -34,6 +34,10 @@ export interface GeneratedDocument {
   version: string;
   excelFileName: string;
   htmlContent: string; // Stored HTML output
+  downloadCount: number;
+  fileSize: number;
+  reportType: string;
+  failedReason?: string;
 }
 
 export interface SystemAuditLog {

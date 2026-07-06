@@ -342,17 +342,120 @@ export const GeneratorPage: React.FC = () => {
     };
   }, [bodyContent, rawHtml]);
 
+  const getCompiledReportHtml = (): string => {
+    const sOutput = document.getElementById("sOutput");
+    const dmeOutput = document.getElementById("dmeOutput");
+    const qPara = document.getElementById("qPara") as HTMLTextAreaElement;
+    const qPt = document.getElementById("qPt") as HTMLTextAreaElement;
+    const spOutput = document.getElementById("spOutput");
+    
+    const sLastHtml = (window as any).sLastHtml;
+    const dmeLastHtml = (window as any).dmeLastHtml;
+    const qLastHtml = (window as any).qLastHtml;
+    const specialStore = (window as any).specialStore || {};
+
+    let htmlBody = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 30px; line-height: 1.6; color: #1e293b; background-color: #f8fafc; }
+          .section-box { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+          h2 { font-size: 16px; font-weight: 700; color: #4f46e5; text-transform: uppercase; margin-top: 0; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; }
+          pre { white-space: pre-wrap; font-family: monospace; font-size: 12px; background: #f8fafc; padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; }
+          .empty { color: #94a3b8; font-style: italic; }
+        </style>
+      </head>
+      <body>
+        <div style="max-width: 800px; margin: 0 auto;">
+          <h1 style="font-size: 22px; margin-bottom: 30px; color: #0f172a; border-bottom: 3px solid #6366f1; padding-bottom: 12px;">Draft Generation Compiled Report</h1>
+    `;
+
+    if (sLastHtml && sOutput) {
+      htmlBody += `
+        <div class="section-box">
+          <h2>Section 01/02</h2>
+          <div>${sOutput.innerHTML}</div>
+        </div>
+      `;
+    }
+    if (dmeLastHtml && dmeOutput) {
+      htmlBody += `
+        <div class="section-box">
+          <h2>DME</h2>
+          <div>${dmeOutput.innerHTML}</div>
+        </div>
+      `;
+    }
+    if (qLastHtml && qPara && qPt) {
+      htmlBody += `
+        <div class="section-box">
+          <h2>Non-DME</h2>
+          <h3 style="font-size: 14px; margin-bottom: 6px; color: #475569;">Paragraph</h3>
+          <pre>${qPara.value}</pre>
+          <h3 style="font-size: 14px; margin-bottom: 6px; color: #475569;">PT List</h3>
+          <pre>${qPt.value}</pre>
+        </div>
+      `;
+    }
+
+    const spKeys = Object.keys(specialStore);
+    if (spKeys.length > 0) {
+      htmlBody += `<div class="section-box"><h2>Special Circumstances</h2>`;
+      spKeys.forEach(k => {
+        const storeItem = specialStore[k];
+        if (storeItem) {
+          htmlBody += `
+            <div style="margin-bottom: 16px;">
+              <h3 style="font-size: 13px; color: #334155; margin-bottom: 4px;">${storeItem.title || k}</h3>
+              <pre>${storeItem.paragraph || ''}</pre>
+            </div>
+          `;
+        }
+      });
+      htmlBody += `</div>`;
+    } else if (spOutput && spOutput.innerText.trim()) {
+      htmlBody += `
+        <div class="section-box">
+          <h2>Special Circumstances</h2>
+          <div>${spOutput.innerHTML}</div>
+        </div>
+      `;
+    }
+
+    htmlBody += `</div></body></html>`;
+    return htmlBody;
+  };
+
   // Handle interception of the "Generate" clicks and logging them to backend for token deduction
   useEffect(() => {
     if (!bodyContent || !rawHtml || !templateId) return;
 
-    const logGenerationOnBackend = async (): Promise<boolean> => {
+    const logGenerationOnBackend = async (
+      reportType: string,
+      reportContent: string,
+      status: string = "Success",
+      failedReason?: string
+    ): Promise<boolean> => {
       const token = localStorage.getItem("pv_token");
       if (!token) return false;
 
+      // Extract actual Excel workbook name if present
+      const fileInput = document.getElementById("fBook") as HTMLInputElement;
+      const excelFileName = fileInput && fileInput.files && fileInput.files[0]
+        ? fileInput.files[0].name
+        : "dynamic_drafting_studio.xlsx";
+
       const formData = new FormData();
       formData.append("template_id", templateId);
-      formData.append("excel_file_name", "dynamic_drafting_studio.xlsx");
+      formData.append("excel_file_name", excelFileName);
+      formData.append("report_type", reportType);
+      formData.append("report_content", reportContent);
+      formData.append("status", status);
+      if (failedReason) {
+        formData.append("failed_reason", failedReason);
+      }
 
       const response = await fetch(`${API_BASE_URL}/documents/log-generation`, {
         method: "POST",
@@ -374,38 +477,56 @@ export const GeneratorPage: React.FC = () => {
 
     // Map buttons to their template generator functions
     const runBtns = [
-      { id: "sRun", func: "runSection" },
-      { id: "dmeRun", func: "runDme" },
-      { id: "qRun", func: "runNonDme" },
-      { id: "spRun", func: "runSpecialCircumstances" },
-      { id: "runAll", func: "runAllAvailable" }
+      { id: "sRun", func: "runSection", label: "Section 01_02" },
+      { id: "dmeRun", func: "runDme", label: "DME" },
+      { id: "qRun", func: "runNonDme", label: "Non-DME" },
+      { id: "spRun", func: "runSpecialCircumstances", label: "Special Circumstances" },
+      { id: "runAll", func: "runAllAvailable", label: "All Sections" }
     ];
 
     // Wait a brief moment to ensure template scripts have executed and registered on window
     const timer = setTimeout(() => {
-      runBtns.forEach(({ id, func }) => {
+      runBtns.forEach(({ id, func, label }) => {
         const btn = document.getElementById(id);
         const originalFunc = (window as any)[func];
         if (btn && originalFunc && !(originalFunc as any).__isWrapped) {
           
           const wrappedFunc = async (event: Event) => {
-            // 1. Check remaining tokens if user is not Admin
+            // 1. Check remaining tokens if user is not Admin (only for Success path validation)
             if (user?.role !== "Admin" && remainingTokens <= 0) {
               alert("You have reached your report generation quota limit. Please contact an administrator to increase your allocation limit.");
               return;
             }
 
+            let compileSuccess = false;
+            let errorMsg = "";
+
             try {
               // 2. Run original template generator function (awaits async file reads / generation)
               await originalFunc(event);
-
-              // 3. Log to backend after successful generation completes
-              const success = await logGenerationOnBackend();
-              if (success && user?.role !== "Admin") {
-                alert("Report generated successfully! 1 token deducted from your quota.");
-              }
+              compileSuccess = true;
             } catch (err: any) {
               console.error("Template generation error:", err);
+              errorMsg = err.message || "Unknown client-side generation error";
+            }
+
+            try {
+              if (compileSuccess) {
+                // Compile the HTML report content
+                const reportContent = getCompiledReportHtml();
+                
+                // 3. Log success to backend after successful generation completes
+                const success = await logGenerationOnBackend(label, reportContent, "Success");
+                if (success && user?.role !== "Admin") {
+                  alert("Report generated successfully! 1 token deducted from your quota.");
+                }
+              } else {
+                // Log failed generation to backend (no token deduction)
+                await logGenerationOnBackend(label, "", "Failed", errorMsg);
+                alert(`Report generation failed: ${errorMsg}`);
+              }
+            } catch (backendErr: any) {
+              console.error("Failed to log generation to backend:", backendErr);
             }
           };
 

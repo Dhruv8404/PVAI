@@ -14,7 +14,7 @@ class DownloadLog(Base):
     
     format: Mapped[str] = mapped_column(String(10), nullable=False) # HTML, PDF
     ip_address: Mapped[str] = mapped_column(String(50), nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), index=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None), index=True)
 
     # Relationships
     document: Mapped["GeneratedDocument"] = relationship(lazy="selectin")

@@ -21,6 +21,15 @@ class GeneratedDocument(Base):
     execution_time_ms: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
 
+    template_version: Mapped[str] = mapped_column(String(50), nullable=True, default="1.0.0")
+    report_type: Mapped[str] = mapped_column(String(50), nullable=True, default="PSUR")
+    generated_file_size: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
+    download_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_downloaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    browser: Mapped[str] = mapped_column(String(255), nullable=True)
+    ip_address: Mapped[str] = mapped_column(String(50), nullable=True)
+    failed_reason: Mapped[str] = mapped_column(String(500), nullable=True)
+
     # Relationships
     user: Mapped["User"] = relationship(back_populates="documents", lazy="selectin")
     template: Mapped["DocumentTemplate"] = relationship(lazy="selectin")
