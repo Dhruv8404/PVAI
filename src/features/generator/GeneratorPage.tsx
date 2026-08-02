@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../../config";
 import { useAuth } from "../../context/AuthContext";
 
 // Helper to scope CSS selectors to prevent styling pollution of the React shell
 const scopeCss = (css: string, prefix: string): string => {
-  // Remove CSS comments first
   const cleanCss = css.replace(/\/\*[\s\S]*?\*\//g, "");
-  
   let result = "";
   let depth = 0;
   let selectorBuffer = "";
@@ -14,11 +13,9 @@ const scopeCss = (css: string, prefix: string): string => {
 
   for (let i = 0; i < cleanCss.length; i++) {
     const char = cleanCss[i];
-    
     if (char === "{") {
       depth++;
       const selector = selectorBuffer.trim();
-      
       if (depth === 1) {
         if (selector.startsWith("@")) {
           result += selector + " {";
@@ -86,21 +83,10 @@ interface TemplateRendererProps {
 const TemplateRenderer: React.FC<TemplateRendererProps> = React.memo(({ bodyContent, stylesText }) => {
   return (
     <div className="generator-template">
-      {stylesText && <style dangerouslySetInnerHTML={{ __html: stylesText }} />}
-      
-      {/* Strict override styles to force full-width responsiveness, table wrapping, and dark-mode compatibility */}
       <style dangerouslySetInnerHTML={{ __html: `
         .generator-template {
-          width: 100% !important;
-          max-width: none !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          display: block !important;
-          box-sizing: border-box !important;
-          overflow-x: auto !important;
-          background: transparent !important;
+          all: unset;
         }
-        
         /* Reset standalone HTML/Body assumptions in templates */
         .generator-template html,
         .generator-template body,
@@ -112,144 +98,90 @@ const TemplateRenderer: React.FC<TemplateRendererProps> = React.memo(({ bodyCont
         .generator-template .wrap,
         .generator-template .content,
         .generator-template .main {
-          width: 100% !important;
-          max-width: 100% !important;
-          min-width: 0 !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          position: relative !important;
-          left: auto !important;
-          right: auto !important;
-          top: auto !important;
-          bottom: auto !important;
-          height: auto !important;
-          min-height: 0 !important;
-          max-height: none !important;
-          overflow: visible !important;
           background: transparent !important;
-          box-shadow: none !important;
-          border: none !important;
-          box-sizing: border-box !important;
-        }
-        
-        .generator-template body {
-          background-color: transparent !important;
-          background-image: none !important;
-        }
-
-        /* Responsive Grid layouts override */
-        .generator-template .grid {
-          width: 100% !important;
+          padding: 0 !important;
+          margin: 0 !important;
           max-width: 100% !important;
+          width: 100% !important;
+          height: auto !important;
+          min-height: auto !important;
+          box-shadow: none !important;
+          border: 0 !important;
         }
-
-        /* Force responsive table wraps */
+        ${stylesText}
+        
+        /* Layout overrides */
+        .generator-template .wrap {
+          max-width: 100% !important;
+          padding: 0 !important;
+        }
+        .generator-template body {
+          font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+          color: #1e293b !important;
+        }
+        .generator-template .grid {
+          grid-template-columns: 360px 1fr !important;
+        }
         .generator-template table {
           width: 100% !important;
-          max-width: 100% !important;
-          display: table !important;
-          margin: 16px 0 !important;
           border-collapse: collapse !important;
+          margin-bottom: 1rem !important;
         }
-        
         .generator-template th,
         .generator-template td {
-          box-sizing: border-box !important;
+          border: 1px solid #e2e8f0 !important;
+          padding: 8px 12px !important;
         }
-        
         .generator-template .table-responsive,
         .generator-template .table-wrapper {
-          width: 100% !important;
-          max-width: 100% !important;
           overflow-x: auto !important;
+          max-width: 100% !important;
+          width: 100% !important;
           display: block !important;
-          margin: 0 !important;
-          padding: 0 !important;
         }
-
-        /* Images and media responsiveness */
+        
+        /* Media & Form constraints */
         .generator-template img,
         .generator-template video {
           max-width: 100% !important;
           height: auto !important;
-          display: block !important;
         }
-
-        /* Form elements stretching */
         .generator-template form,
         .generator-template .form-container {
-          width: 100% !important;
           max-width: 100% !important;
-          box-sizing: border-box !important;
         }
-        
         .generator-template input,
         .generator-template select,
         .generator-template textarea {
-          width: 100% !important;
           max-width: 100% !important;
-          box-sizing: border-box !important;
         }
-
-        /* Theme variables mapping to keep light/dark mode consistent with React application */
         .generator-template .card,
         .generator-template .metric,
         .generator-template .settings,
         .generator-template .metric-card {
-          background-color: hsl(var(--card)) !important;
-          border-color: hsl(var(--border) / 0.8) !important;
-          color: hsl(var(--foreground)) !important;
-          box-shadow: none !important;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
         }
-
         .generator-template .btn {
-          border-color: hsl(var(--border) / 0.8) !important;
-          background-color: hsl(var(--card)) !important;
-          color: hsl(var(--foreground)) !important;
-          transition: all 0.2s ease-in-out !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          font-size: 13px !important;
+          font-weight: 600 !important;
         }
-
         .generator-template .btn:hover {
-          background-color: hsl(var(--accent)) !important;
-          color: hsl(var(--accent-foreground)) !important;
+          filter: brightness(0.96) !important;
         }
-
         .generator-template .btn.primary,
         .generator-template .btn.blue {
-          background-color: hsl(var(--primary)) !important;
-          color: hsl(var(--primary-foreground)) !important;
-          border: none !important;
+          background-color: #0f172a !important;
+          color: #ffffff !important;
+          border-color: #0f172a !important;
         }
-
         .generator-template .btn.primary:hover,
         .generator-template .btn.blue:hover {
-          opacity: 0.9 !important;
-        }
-
-        .generator-template input,
-        .generator-template select,
-        .generator-template textarea {
-          background-color: hsl(var(--card)) !important;
-          border-color: hsl(var(--border) / 0.8) !important;
-          color: hsl(var(--foreground)) !important;
-        }
-
-        .generator-template label {
-          color: hsl(var(--muted-foreground)) !important;
-        }
-
-        .generator-template th {
-          background-color: hsl(var(--muted) / 0.5) !important;
-          color: hsl(var(--foreground)) !important;
-          border-color: hsl(var(--border) / 0.8) !important;
-        }
-
-        .generator-template td {
-          border-color: hsl(var(--border) / 0.8) !important;
-          color: hsl(var(--foreground)) !important;
+          background-color: #1e293b !important;
         }
       `}} />
-      
       <div dangerouslySetInnerHTML={{ __html: bodyContent }} />
     </div>
   );
@@ -257,6 +189,14 @@ const TemplateRenderer: React.FC<TemplateRendererProps> = React.memo(({ bodyCont
 
 export const GeneratorPage: React.FC = () => {
   const { user, refreshSession } = useAuth();
+  const navigate = useNavigate();
+  const { templateId: routeTemplateId } = useParams<{ templateId?: string }>();
+  
+  // Template states
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<any | null>(null);
+  
+  // Active loaded template content state
   const [templateId, setTemplateId] = useState<string>("");
   const [rawHtml, setRawHtml] = useState<string>("");
   const [bodyContent, setBodyContent] = useState<string>("");
@@ -266,52 +206,112 @@ export const GeneratorPage: React.FC = () => {
 
   const remainingTokens = user?.role === "Admin" ? 9999 : (user?.reportLimit || 5) - (user?.documentsGenerated || 0);
 
+  // 1. Fetch available templates list
+  const fetchTemplatesList = async (): Promise<any[]> => {
+    try {
+      const token = localStorage.getItem("pv_token");
+      const headers: Record<string, string> = token ? { "Authorization": `Bearer ${token}` } : {};
+      const specUrl = API_BASE_URL.replace("/api/v1", "/api");
+      const res = await fetch(`${specUrl}/templates/`, { headers });
+      if (!res.ok) throw new Error("Failed to load templates list.");
+      const json = await res.json();
+      if (json.success && json.data) {
+        setTemplates(json.data);
+        return json.data;
+      }
+      return [];
+    } catch (e: any) {
+      console.error(e);
+      setError(e.message || "Error fetching available templates.");
+      return [];
+    }
+  };
+
+  // 2. Fetch specific template HTML content and parse it
+  const fetchTemplateContent = async (id: string) => {
+    setLoading(true);
+    setError("");
+    try {
+      const token = localStorage.getItem("pv_token");
+      const headers: Record<string, string> = token ? { "Authorization": `Bearer ${token}` } : {};
+      const specUrl = API_BASE_URL.replace("/api/v1", "/api");
+      const res = await fetch(`${specUrl}/templates/${id}/`, { headers });
+      if (!res.ok) throw new Error("Failed to load selected template layout.");
+      const json = await res.json();
+      
+      if (json.success && json.data) {
+        const raw = json.data.html_content;
+        setRawHtml(raw);
+        setTemplateId(id);
+
+        // Extract content using DOMParser
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(raw, "text/html");
+
+        // Extract inner body content
+        const bodyHtml = doc.body ? doc.body.innerHTML : raw;
+        setBodyContent(bodyHtml);
+
+        // Extract and scope styles to .generator-template
+        const styleElements = doc.querySelectorAll("style");
+        const rawStyles = Array.from(styleElements)
+          .map((el) => el.textContent || "")
+          .join("\n");
+        const scopedStyles = scopeCss(rawStyles, ".generator-template");
+        setStylesText(scopedStyles);
+      } else {
+        setError(json.message || "Failed to load template layout.");
+      }
+    } catch (e: any) {
+      console.error(e);
+      setError(e.message || "Error loading template details.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 3. Load templates list once on mount
   useEffect(() => {
-    const fetchTemplate = async () => {
-      try {
-        const token = localStorage.getItem("pv_token");
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-        const specUrl = API_BASE_URL.replace("/api/v1", "/api");
-        const res = await fetch(`${specUrl}/templates/active/`, { headers });
-        if (!res.ok) {
-          throw new Error("Failed to load current active template.");
-        }
-        const data = await res.json();
-        if (data.success && data.data) {
-          const raw = data.data.html_content;
-          setRawHtml(raw);
-          setTemplateId(data.data.id);
-
-          // Extract content using DOMParser
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(raw, "text/html");
-
-          // Extract inner body content
-          const bodyHtml = doc.body ? doc.body.innerHTML : raw;
-          setBodyContent(bodyHtml);
-
-          // Extract and scope styles to .generator-template
-          const styleElements = doc.querySelectorAll("style");
-          const rawStyles = Array.from(styleElements)
-            .map((el) => el.textContent || "")
-            .join("\n");
-          const scopedStyles = scopeCss(rawStyles, ".generator-template");
-          setStylesText(scopedStyles);
-        } else {
-          setError(data.message || "No active template available.");
-        }
-      } catch (e: any) {
-        setError(e.message || "Error fetching template.");
-      } finally {
+    const loadList = async () => {
+      const list = await fetchTemplatesList();
+      if (list.length === 0) {
+        setError("No templates available. Please upload a template in the Templates Admin page first.");
         setLoading(false);
       }
     };
-    fetchTemplate();
+    loadList();
   }, []);
 
+  // 4. Handle route updates and active template sync
+  useEffect(() => {
+    if (templates.length === 0) return;
+
+    let targetId = routeTemplateId;
+    
+    // If opened base /generator path, redirect to last saved or first available
+    if (!targetId) {
+      const savedId = sessionStorage.getItem("pv_selected_template_id");
+      if (savedId && templates.some((t: any) => t.id === savedId)) {
+        targetId = savedId;
+      } else {
+        targetId = templates[0].id;
+      }
+      navigate(`/generator/${targetId}`, { replace: true });
+      return;
+    }
+
+    const activeTpl = templates.find((t: any) => t.id === targetId);
+    if (activeTpl) {
+      setSelectedTemplate(activeTpl);
+      sessionStorage.setItem("pv_selected_template_id", targetId);
+      fetchTemplateContent(targetId);
+    } else {
+      // Invalid ID in path -> redirect to first template
+      navigate(`/generator/${templates[0].id}`, { replace: true });
+    }
+  }, [routeTemplateId, templates]);
+
+  // 5. Script Injection side-effect
   useEffect(() => {
     if (!bodyContent || !rawHtml) return;
 
@@ -369,8 +369,8 @@ export const GeneratorPage: React.FC = () => {
       </head>
       <body>
         <div style="max-width: 800px; margin: 0 auto;">
-          <h1 style="font-size: 22px; margin-bottom: 30px; color: #0f172a; border-bottom: 3px solid #6366f1; padding-bottom: 12px;">Draft Generation Compiled Report</h1>
-    `;
+          <h1 style="font-size: 22px; margin-bottom: 30px; color: #0f172a; border-bottom: 3px solid #6366f1; padding-bottom: 12px;">Draft Compilation Report</h1>
+      `;
 
     if (sLastHtml && sOutput) {
       htmlBody += `
@@ -428,7 +428,7 @@ export const GeneratorPage: React.FC = () => {
     return htmlBody;
   };
 
-  // Handle interception of the "Generate" clicks and logging them to backend for token deduction
+  // 6. Hook button handlers inside template to log progress on completion
   useEffect(() => {
     if (!bodyContent || !rawHtml || !templateId) return;
 
@@ -492,7 +492,6 @@ export const GeneratorPage: React.FC = () => {
         if (btn && originalFunc && !(originalFunc as any).__isWrapped) {
           
           const wrappedFunc = async (event: Event) => {
-            // 1. Check remaining tokens if user is not Admin (only for Success path validation)
             if (user?.role !== "Admin" && remainingTokens <= 0) {
               alert("You have reached your report generation quota limit. Please contact an administrator to increase your allocation limit.");
               return;
@@ -502,7 +501,6 @@ export const GeneratorPage: React.FC = () => {
             let errorMsg = "";
 
             try {
-              // 2. Run original template generator function (awaits async file reads / generation)
               await originalFunc(event);
               compileSuccess = true;
             } catch (err: any) {
@@ -512,16 +510,12 @@ export const GeneratorPage: React.FC = () => {
 
             try {
               if (compileSuccess) {
-                // Compile the HTML report content
                 const reportContent = getCompiledReportHtml();
-                
-                // 3. Log success to backend after successful generation completes
                 const success = await logGenerationOnBackend(label, reportContent, "Success");
                 if (success && user?.role !== "Admin") {
                   alert("Report generated successfully! 1 token deducted from your quota.");
                 }
               } else {
-                // Log failed generation to backend (no token deduction)
                 await logGenerationOnBackend(label, "", "Failed", errorMsg);
                 alert(`Report generation failed: ${errorMsg}`);
               }
@@ -533,7 +527,6 @@ export const GeneratorPage: React.FC = () => {
           (wrappedFunc as any).__isWrapped = true;
           (wrappedFunc as any).original = originalFunc;
           
-          // Re-assign window function and button onclick handler
           (window as any)[func] = wrappedFunc;
           btn.onclick = wrappedFunc;
         }
@@ -553,28 +546,36 @@ export const GeneratorPage: React.FC = () => {
     };
   }, [bodyContent, rawHtml, templateId, user, remainingTokens, refreshSession]);
 
-  if (loading) {
+  if (loading && !selectedTemplate) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 rounded-full border-4 border-t-indigo-600 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
-          <span className="text-xs font-semibold text-slate-500">Loading dynamic drafting studio...</span>
+          <span className="text-xs font-semibold text-slate-500">Querying available templates...</span>
         </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-6 bg-red-50 dark:bg-rose-950/20 border border-red-200 dark:border-rose-900/30 rounded-xl text-red-700 dark:text-red-400 text-sm">
-        <h4 className="font-bold mb-1">Template Loader Error</h4>
-        <p>{error}</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {/* Template Header Banner */}
+      {selectedTemplate && (
+        <div className="flex flex-col space-y-1 p-4 bg-indigo-50/20 dark:bg-indigo-950/5 border border-indigo-100 dark:border-indigo-950/20 rounded-xl shadow-2xs">
+          <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+            Active Generation Studio
+          </span>
+          <h2 className="text-base font-bold text-slate-800 dark:text-zinc-150">
+            {selectedTemplate.name} <span className="text-xs font-mono font-normal text-slate-400 dark:text-zinc-500">v{selectedTemplate.version}</span>
+          </h2>
+          {selectedTemplate.description && (
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+              {selectedTemplate.description}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Quota Limit Banner */}
       {user?.role !== "Admin" && remainingTokens <= 0 && (
         <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-xl text-amber-700 dark:text-amber-400 text-xs font-semibold leading-relaxed flex items-center gap-3 animate-fade-in">
@@ -595,7 +596,22 @@ export const GeneratorPage: React.FC = () => {
         </div>
       )}
 
-      <TemplateRenderer bodyContent={bodyContent} stylesText={stylesText} />
+      {/* If loading a specific template */}
+      {loading ? (
+        <div className="flex items-center justify-center min-h-[300px]">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-6 w-6 rounded-full border-4 border-t-indigo-600 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+            <span className="text-xs font-semibold text-slate-500">Loading template layout...</span>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="p-6 bg-red-50 dark:bg-rose-950/20 border border-red-200 dark:border-rose-900/30 rounded-xl text-red-700 dark:text-red-400 text-sm">
+          <h4 className="font-bold mb-1">Template Loader Error</h4>
+          <p>{error}</p>
+        </div>
+      ) : (
+        <TemplateRenderer bodyContent={bodyContent} stylesText={stylesText} />
+      )}
     </div>
   );
 };

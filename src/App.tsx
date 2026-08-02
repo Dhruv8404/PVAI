@@ -98,6 +98,7 @@ export const App: React.FC = () => {
                     </AdminRoute>
                   } 
                 />
+                <Route path="generator/:templateId" element={<GeneratorPage />} />
                 <Route path="generator" element={<GeneratorPage />} />
                 <Route path="history" element={<HistoryPage />} />
                 <Route path="" element={<Navigate to="/dashboard" replace />} />

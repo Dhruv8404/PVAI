@@ -11,6 +11,8 @@ class GeneratedDocument(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     template_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("document_templates.id", ondelete="SET NULL"), nullable=True, index=True)
+    html_template_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=True)
+    template_name: Mapped[str] = mapped_column(String(255), nullable=True)
     
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     excel_file_name: Mapped[str] = mapped_column(String(255), nullable=False)

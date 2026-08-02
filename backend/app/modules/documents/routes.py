@@ -55,6 +55,10 @@ async def get_history(
             item.created_by_name = d.user.name
         if d.template:
             item.template_name = d.template.name
+        if d.html_template_id:
+            item.template_id = d.html_template_id
+        if d.template_name:
+            item.template_name = d.template_name
         response_data.append(item)
 
     return ApiResponse(
@@ -76,6 +80,10 @@ async def get_document_details(
         item.created_by_name = doc.user.name
     if doc.template:
         item.template_name = doc.template.name
+    if doc.html_template_id:
+        item.template_id = doc.html_template_id
+    if doc.template_name:
+        item.template_name = doc.template_name
 
     return ApiResponse(
         success=True,

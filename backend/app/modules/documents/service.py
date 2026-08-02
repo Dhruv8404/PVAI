@@ -199,34 +199,27 @@ class DocumentService:
             file_bytes = report_content.encode("utf-8")
             file_size = len(file_bytes)
             
-            # Check if active storage is Cloudinary
-            if settings.STORAGE_TYPE == "cloudinary":
-                import cloudinary
-                import cloudinary.uploader
+            # Use unified storage provider abstraction
+            import tempfile
+            os.makedirs("storage/temp", exist_ok=True)
+            temp_fd, temp_path = tempfile.mkstemp(dir="storage/temp", suffix=".html")
+            try:
+                with os.fdopen(temp_fd, 'wb') as tmp:
+                    tmp.write(file_bytes)
                 
-                try:
-                    cloudinary.config(
-                        cloud_name=settings.CLOUDINARY_CLOUD_NAME,
-                        api_key=settings.CLOUDINARY_API_KEY,
-                        api_secret=settings.CLOUDINARY_API_SECRET,
-                        secure=True
-                    )
-                    upload_res = cloudinary.uploader.upload(
-                        file_bytes,
-                        resource_type="raw",
-                        folder="pv_generated_reports",
-                        public_id=f"report_{uuid.uuid4().hex}.html"
-                    )
-                    saved_html_path = upload_res.get("secure_url") or "client_side_draft"
-                except Exception as e:
-                    # Fallback to local file storage
-                    storage = get_storage()
-                    html_subpath = f"generated/html/{uuid.uuid4()}_client_report.html"
-                    saved_html_path = await storage.save_file(file_bytes, html_subpath)
-            else:
+                from app.core.storage import StorageProviderFactory
+                provider = StorageProviderFactory.get_provider()
+                dest_name = f"report_{uuid.uuid4().hex}.html"
+                saved_html_path = provider.upload_file(temp_path, dest_name)
+            except Exception as e:
+                logger.error(f"Failed to upload report to storage provider: {e}")
+                # Fallback to local copy
                 storage = get_storage()
                 html_subpath = f"generated/html/{uuid.uuid4()}_client_report.html"
                 saved_html_path = await storage.save_file(file_bytes, html_subpath)
+            finally:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
 
         # If report generation fails, do NOT create a History record.
         if status != "Success":
@@ -234,6 +227,8 @@ class DocumentService:
                 id=uuid.uuid4(),
                 user_id=user.id,
                 template_id=None,
+                html_template_id=template_id,
+                template_name=tpl.name,
                 name=f"{tpl.name.upper()}_{report_type}_Report_{new_date_label()}",
                 excel_file_name=excel_file_name,
                 html_path=saved_html_path,
@@ -253,6 +248,8 @@ class DocumentService:
         doc_in_data = {
             "user_id": user.id,
             "template_id": None,
+            "html_template_id": template_id,
+            "template_name": tpl.name,
             "name": f"{tpl.name.upper()}_{report_type}_Report_{new_date_label()}",
             "excel_file_name": excel_file_name,
             "html_path": saved_html_path,

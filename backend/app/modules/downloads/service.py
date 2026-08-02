@@ -41,24 +41,26 @@ class DownloadService:
         # Handle legacy client side draft fallback
         if not target_path or target_path == "client_side_draft":
             file_bytes = b"<html><body><h3>Client Side Draft Report</h3><p>This draft was generated on the client side without server-side file persistence.</p></body></html>"
-        # Download from Cloudinary if path is a URL
+        # Download using unified storage provider abstraction
         elif target_path.startswith("http://") or target_path.startswith("https://"):
-            import urllib.request
-            import asyncio
-            
-            def fetch_url(url: str) -> bytes:
-                req = urllib.request.Request(
-                    url,
-                    headers={'User-Agent': 'Mozilla/5.0'}
-                )
-                with urllib.request.urlopen(req) as response:
-                    return response.read()
-            
-            loop = asyncio.get_running_loop()
+            from app.core.storage import StorageProviderFactory
+            import tempfile
+            import os
+            os.makedirs("storage/temp", exist_ok=True)
+            temp_fd, temp_path = tempfile.mkstemp(dir="storage/temp")
             try:
-                file_bytes = await loop.run_in_executor(None, fetch_url, target_path)
+                provider = StorageProviderFactory.get_provider()
+                success = provider.download_file(target_path, temp_path)
+                if not success:
+                    raise NotFoundException(f"Failed to retrieve report file from storage: {target_path}")
+                with open(temp_path, "rb") as f:
+                    file_bytes = f.read()
             except Exception as e:
-                raise NotFoundException(f"Failed to retrieve report file from Cloudinary storage: {str(e)}")
+                raise NotFoundException(f"Failed to retrieve report file from storage: {str(e)}")
+            finally:
+                os.close(temp_fd)
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
         # Read local file
         else:
             storage = get_storage()

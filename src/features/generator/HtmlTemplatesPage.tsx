@@ -10,16 +10,14 @@ import {
   FileCode, 
   UploadCloud, 
   Eye, 
-  CheckCircle, 
-  XCircle, 
   Trash2, 
   Clock, 
   User, 
   FileText,
-  AlertTriangle,
-  ArrowLeft
+  ArrowLeft,
+  Edit,
+  Tag
 } from "lucide-react";
-
 
 interface HtmlTemplate {
   id: string;
@@ -42,6 +40,9 @@ export const HtmlTemplatesPage: React.FC = () => {
   // Modals state
   const [uploadOpen, setUploadOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  
   const [previewContent, setPreviewContent] = useState("");
   const [previewName, setPreviewName] = useState("");
 
@@ -51,6 +52,12 @@ export const HtmlTemplatesPage: React.FC = () => {
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  // Edit/Rename state
+  const [selectedTemplate, setSelectedTemplate] = useState<HtmlTemplate | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editVersion, setEditVersion] = useState("");
+  const [editDescription, setEditDescription] = useState("");
 
   const fetchTemplates = async () => {
     setLoading(true);
@@ -146,51 +153,87 @@ export const HtmlTemplatesPage: React.FC = () => {
     }
   };
 
-  const handleActivate = async (id: string, name: string) => {
-    try {
-      const token = localStorage.getItem("pv_token");
-      const specUrl = API_BASE_URL.replace("/api/v1", "/api");
-      const res = await fetch(`${specUrl}/templates/${id}/activate/`, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.detail || "Failed to activate template.");
-
-      if (json.success) {
-        toast.success(`Template '${name}' activated successfully.`);
-        fetchTemplates();
-      }
-    } catch (e: any) {
-      toast.error(e.message || "Error activating template.");
-    }
+  const handleRenameClick = (tpl: HtmlTemplate) => {
+    setSelectedTemplate(tpl);
+    setEditName(tpl.name);
+    setRenameOpen(true);
   };
 
-  const handleDeactivate = async (id: string, name: string) => {
-    try {
-      const token = localStorage.getItem("pv_token");
-      const specUrl = API_BASE_URL.replace("/api/v1", "/api");
-      const res = await fetch(`${specUrl}/templates/${id}/deactivate/`, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.detail || "Failed to deactivate template.");
-
-      if (json.success) {
-        toast.success(`Template '${name}' deactivated successfully.`);
-        fetchTemplates();
-      }
-    } catch (e: any) {
-      toast.error(e.message || "Error deactivating template.");
-    }
-  };
-
-  const handleDelete = async (id: string, isActive: boolean, name: string) => {
-    if (isActive) {
-      toast.error("Cannot delete an active template. Please activate another template first.");
+  const handleRenameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTemplate) return;
+    if (!editName.trim()) {
+      toast.error("Template name cannot be empty.");
       return;
     }
+
+    try {
+      const token = localStorage.getItem("pv_token");
+      const specUrl = API_BASE_URL.replace("/api/v1", "/api");
+      const res = await fetch(`${specUrl}/templates/${selectedTemplate.id}/rename/`, {
+        method: "PUT",
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ name: editName.trim() })
+      });
+      
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || "Failed to rename template.");
+
+      if (json.success) {
+        toast.success("Template renamed successfully.");
+        setRenameOpen(false);
+        fetchTemplates();
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Error renaming template.");
+    }
+  };
+
+  const handleEditClick = (tpl: HtmlTemplate) => {
+    setSelectedTemplate(tpl);
+    setEditName(tpl.name);
+    setEditVersion(tpl.version);
+    setEditDescription(tpl.description || "");
+    setEditOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTemplate) return;
+
+    try {
+      const token = localStorage.getItem("pv_token");
+      const specUrl = API_BASE_URL.replace("/api/v1", "/api");
+      const res = await fetch(`${specUrl}/templates/${selectedTemplate.id}/metadata/`, {
+        method: "PUT",
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ 
+          name: editName.trim(),
+          version: editVersion.trim(),
+          description: editDescription.trim()
+        })
+      });
+      
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || "Failed to update template metadata.");
+
+      if (json.success) {
+        toast.success("Template metadata updated successfully.");
+        setEditOpen(false);
+        fetchTemplates();
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Error updating template metadata.");
+    }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
     if (!window.confirm(`Are you sure you want to delete '${name}'?`)) return;
 
     try {
@@ -232,8 +275,6 @@ export const HtmlTemplatesPage: React.FC = () => {
     }
   };
 
-  const activeTemplate = templates.find((t) => t.is_active);
-
   // Generate blob URL for safe sandbox iframe preview
   const previewBlobUrl = React.useMemo(() => {
     if (!previewContent) return "";
@@ -269,7 +310,7 @@ export const HtmlTemplatesPage: React.FC = () => {
             HTML Template Management
           </h1>
           <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 font-medium">
-            Manage, version, and activate dynamic HTML drafting studio layouts for the Generator page.
+            Manage, version, and edit available HTML drafting studio layout templates for the generator page.
           </p>
         </div>
         <Button 
@@ -282,55 +323,6 @@ export const HtmlTemplatesPage: React.FC = () => {
         </Button>
       </div>
 
-      {/* Active Template card */}
-      <Card className="border-indigo-100 dark:border-indigo-950 bg-indigo-50/30 dark:bg-indigo-950/10 overflow-hidden">
-        <CardContent className="p-6">
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-indigo-100 dark:bg-indigo-950 rounded-xl text-indigo-600 dark:text-indigo-400 shadow-xs">
-              <FileCode className="h-6 w-6" />
-            </div>
-            <div className="flex-1 space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base font-bold text-slate-900 dark:text-zinc-100">
-                  Current Active Template
-                </h2>
-                <Badge variant={activeTemplate ? "success" : "warning"}>
-                  {activeTemplate ? "Active" : "No Active Template"}
-                </Badge>
-              </div>
-              
-              {activeTemplate ? (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1 text-xs font-semibold text-slate-600 dark:text-zinc-400">
-                  <div className="flex items-center gap-1.5">
-                    <FileText className="h-4 w-4 text-slate-400" />
-                    <span>Name: <strong className="text-slate-900 dark:text-zinc-200">{activeTemplate.name}</strong></span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-4 w-4 text-slate-400" />
-                    <span>Version: <strong className="text-slate-900 dark:text-zinc-200">{activeTemplate.version}</strong></span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <User className="h-4 w-4 text-slate-400" />
-                    <span>Uploaded By: <strong className="text-slate-900 dark:text-zinc-200">{activeTemplate.uploaded_by || "System"}</strong></span>
-                  </div>
-                  <div className="flex items-center gap-1.5 sm:col-span-3">
-                    <Clock className="h-4 w-4 text-slate-400" />
-                    <span>Upload Date: <strong className="text-slate-900 dark:text-zinc-200">{new Date(activeTemplate.created_at).toLocaleString()}</strong></span>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-400 font-medium pt-1">
-                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <p>
-                    No template is currently active. The Document Generator will fall back to using the latest uploaded template. Please activate a template below.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Template List Table */}
       <Card>
         <CardContent className="p-0">
@@ -340,16 +332,17 @@ export const HtmlTemplatesPage: React.FC = () => {
                 <tr className="border-b border-slate-100 dark:border-zinc-800 bg-slate-50/50 dark:bg-zinc-900/30 text-slate-500 uppercase tracking-wider text-[10px] font-bold">
                   <th className="px-6 py-4">Template Name</th>
                   <th className="px-6 py-4">Version</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Uploaded By</th>
+                  <th className="px-6 py-4">Description</th>
                   <th className="px-6 py-4">Upload Date</th>
+                  <th className="px-6 py-4">Uploaded By</th>
+                  <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/80 text-slate-700 dark:text-zinc-300">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
                       <div className="inline-flex items-center gap-2">
                         <div className="h-4 w-4 rounded-full border-2 border-t-indigo-600 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
                         <span>Querying templates...</span>
@@ -358,7 +351,7 @@ export const HtmlTemplatesPage: React.FC = () => {
                   </tr>
                 ) : templates.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
                       No HTML templates have been uploaded yet.
                     </td>
                   </tr>
@@ -369,26 +362,22 @@ export const HtmlTemplatesPage: React.FC = () => {
                       className="hover:bg-indigo-50/15 dark:hover:bg-indigo-950/5 border-l-2 border-l-transparent hover:border-l-indigo-650 transition-all duration-200 group"
                     >
                       <td className="px-6 py-4 font-bold text-slate-900 dark:text-zinc-100">
-                        <div>
-                          <div>{tpl.name}</div>
-                          {tpl.description && (
-                            <div className="text-[10px] font-normal text-slate-400 dark:text-zinc-500 mt-0.5 line-clamp-1">
-                              {tpl.description}
-                            </div>
-                          )}
-                        </div>
+                        {tpl.name}
                       </td>
                       <td className="px-6 py-4 font-mono font-bold text-[11px] text-slate-500">{tpl.version}</td>
-                      <td className="px-6 py-4">
-                        <Badge variant={tpl.is_active ? "success" : "neutral"}>
-                          {tpl.is_active ? "Active" : "Inactive"}
-                        </Badge>
+                      <td className="px-6 py-4 max-w-xs truncate text-slate-500 dark:text-zinc-400" title={tpl.description || ""}>
+                        {tpl.description || <span className="text-slate-350 dark:text-zinc-600 italic">No description</span>}
                       </td>
-                      <td className="px-6 py-4 text-slate-650">{tpl.uploaded_by || "System"}</td>
                       <td className="px-6 py-4 text-slate-500">
                         {new Date(tpl.created_at).toLocaleDateString()} {new Date(tpl.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </td>
-                      <td className="px-6 py-4 text-right space-x-1.5 whitespace-nowrap">
+                      <td className="px-6 py-4 text-slate-650">{tpl.uploaded_by || "System"}</td>
+                      <td className="px-6 py-4">
+                        <Badge variant="success">
+                          Available
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 text-right space-x-1 whitespace-nowrap">
                         <Button 
                           variant="ghost" 
                           size="sm" 
@@ -400,36 +389,33 @@ export const HtmlTemplatesPage: React.FC = () => {
                           View
                         </Button>
                         
-                        {tpl.is_active ? (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handleDeactivate(tpl.id, tpl.name)}
-                            className="border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:border-rose-350 hover:bg-rose-50 hover:text-rose-600 dark:hover:border-rose-900/40 dark:hover:bg-rose-950/20 dark:hover:text-rose-400 transition-all duration-200"
-                            title="Deactivate Template"
-                          >
-                            <XCircle className="h-3.5 w-3.5" />
-                            Deactivate
-                          </Button>
-                        ) : (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handleActivate(tpl.id, tpl.name)}
-                            className="border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 hover:border-emerald-350 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:border-emerald-900/40 dark:hover:bg-emerald-950/20 dark:hover:text-emerald-400 transition-all duration-200"
-                            title="Activate Template"
-                          >
-                            <CheckCircle className="h-3.5 w-3.5" />
-                            Activate
-                          </Button>
-                        )}
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleEditClick(tpl)}
+                          className="text-slate-600 dark:text-zinc-450 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 transition-all duration-200"
+                          title="Edit Metadata"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                          Edit Metadata
+                        </Button>
+
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleRenameClick(tpl)}
+                          className="text-slate-600 dark:text-zinc-450 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 transition-all duration-200"
+                          title="Rename"
+                        >
+                          <Tag className="h-3.5 w-3.5" />
+                          Rename
+                        </Button>
                         
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          onClick={() => handleDelete(tpl.id, tpl.is_active, tpl.name)}
+                          onClick={() => handleDelete(tpl.id, tpl.name)}
                           className="text-rose-600 dark:text-rose-450 hover:bg-rose-50 dark:hover:bg-rose-950/20 hover:text-rose-700 dark:hover:text-rose-350 transition-all duration-200"
-                          disabled={tpl.is_active}
                           title="Delete Template"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -456,7 +442,7 @@ export const HtmlTemplatesPage: React.FC = () => {
               className="w-full border border-slate-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-sm text-slate-900 dark:text-zinc-50"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Drafting Studio v2"
+              placeholder="e.g. PV Signal Drafting Assistant"
               required
             />
           </div>
@@ -507,6 +493,84 @@ export const HtmlTemplatesPage: React.FC = () => {
             </Button>
             <Button variant="primary" type="submit" isLoading={uploading}>
               Upload
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Rename Modal */}
+      <Modal isOpen={renameOpen} onClose={() => setRenameOpen(false)} title="Rename Template">
+        <form onSubmit={handleRenameSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-zinc-350 uppercase tracking-wider mb-1.5">
+              Template Name
+            </label>
+            <input 
+              type="text" 
+              className="w-full border border-slate-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-sm text-slate-900 dark:text-zinc-50"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="New template name..."
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" type="button" onClick={() => setRenameOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit">
+              Save Name
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Metadata Modal */}
+      <Modal isOpen={editOpen} onClose={() => setEditOpen(false)} title="Edit Template Metadata">
+        <form onSubmit={handleEditSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-zinc-350 uppercase tracking-wider mb-1.5">
+              Template Name
+            </label>
+            <input 
+              type="text" 
+              className="w-full border border-slate-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-sm text-slate-900 dark:text-zinc-50"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="Template name..."
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-zinc-350 uppercase tracking-wider mb-1.5">
+              Version
+            </label>
+            <input 
+              type="text" 
+              className="w-full border border-slate-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-sm text-slate-900 dark:text-zinc-50 font-mono"
+              value={editVersion}
+              onChange={(e) => setEditVersion(e.target.value)}
+              placeholder="1.0.0"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-zinc-350 uppercase tracking-wider mb-1.5">
+              Description
+            </label>
+            <textarea 
+              className="w-full border border-slate-300 dark:border-zinc-700 rounded-lg px-3 py-2 bg-white dark:bg-zinc-800 text-sm text-slate-900 dark:text-zinc-50 h-24 resize-none"
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              placeholder="Summary of layout updates..."
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" type="button" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit">
+              Save Changes
             </Button>
           </div>
         </form>
