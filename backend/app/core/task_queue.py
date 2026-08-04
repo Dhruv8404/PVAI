@@ -5,7 +5,12 @@ import time
 import threading
 from typing import Callable, Dict, Any, Optional, List
 from datetime import datetime, UTC
-from app.core.metrics import HAS_PROMETHEUS, Gauge, Counter
+from app.core.metrics import (
+    HAS_PROMETHEUS,
+    QUEUE_BACKLOG,
+    WORKER_ACTIVE_GAUGE,
+    TASKS_PROCESSED
+)
 
 logger = logging.getLogger("app.startup")
 
@@ -19,20 +24,6 @@ worker_heartbeats: Dict[str, float] = {}
 # Thread-safe PriorityQueue: items are (priority_int, timestamp, task_id, func, args, kwargs)
 # High = 1, Default = 2, Low = 3
 _task_queue = queue.PriorityQueue()
-
-# Queue metrics if Prometheus is active
-if HAS_PROMETHEUS:
-    QUEUE_BACKLOG = Gauge("task_queue_backlog", "Total pending tasks in queue")
-    WORKER_ACTIVE_GAUGE = Gauge("task_worker_active_count", "Total active worker threads")
-    TASKS_PROCESSED = Counter("task_processed_total", "Total tasks processed", ["status"])
-else:
-    class DummyMetric:
-        def set(self, val): pass
-        def inc(self): pass
-        def labels(self, *args, **kwargs): return self
-    QUEUE_BACKLOG = DummyMetric()
-    WORKER_ACTIVE_GAUGE = DummyMetric()
-    TASKS_PROCESSED = DummyMetric()
 
 
 class BackgroundWorker(threading.Thread):

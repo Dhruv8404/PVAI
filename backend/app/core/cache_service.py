@@ -4,20 +4,13 @@ import logging
 from typing import Any, Optional, Dict
 from app.core.config import settings
 from app.core.redis_service import redis_service
-from app.core.metrics import HAS_PROMETHEUS, Counter
+from app.core.metrics import (
+    HAS_PROMETHEUS,
+    CACHE_HITS,
+    CACHE_MISSES
+)
 
 logger = logging.getLogger("app.ai")
-
-# Cache monitoring metrics if Prometheus is active
-if HAS_PROMETHEUS:
-    CACHE_HITS = Counter("cache_hits_total", "Total cache hits", ["cache_type"])
-    CACHE_MISSES = Counter("cache_misses_total", "Total cache misses", ["cache_type"])
-else:
-    class DummyMetric:
-        def labels(self, *args, **kwargs): return self
-        def inc(self): pass
-    CACHE_HITS = DummyMetric()
-    CACHE_MISSES = DummyMetric()
 
 
 class LocalMemoryCache:

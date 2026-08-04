@@ -7,116 +7,162 @@ from typing import Tuple
 logger = logging.getLogger("app.startup")
 
 try:
-    from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+    from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, REGISTRY
+    from prometheus_client.registry import DuplicateTimeseries
     HAS_PROMETHEUS = True
 except ImportError:
     HAS_PROMETHEUS = False
 
+
+class DummyMetric:
+    def __init__(self, *args, **kwargs): pass
+    def labels(self, *args, **kwargs): return self
+    def inc(self, *args, **kwargs): pass
+    def dec(self, *args, **kwargs): pass
+    def observe(self, *args, **kwargs): pass
+    def set(self, *args, **kwargs): pass
+
+
+def _create_metric(cls, name, documentation, *args, **kwargs):
+    if not HAS_PROMETHEUS:
+        return DummyMetric()
+    try:
+        return cls(name, documentation, *args, **kwargs)
+    except Exception as e:
+        if "DuplicateTimeseries" in type(e).__name__ or "Duplicated" in str(e):
+            if hasattr(REGISTRY, "_names_to_collectors") and name in REGISTRY._names_to_collectors:
+                return REGISTRY._names_to_collectors[name]
+        raise e
+
+
 # Define all metrics if prometheus_client library is available
 if HAS_PROMETHEUS:
-    HTTP_REQUESTS_TOTAL = Counter(
+    HTTP_REQUESTS_TOTAL = _create_metric(
+        Counter,
         "http_requests_total",
         "Total HTTP requests handled by the server",
         ["method", "endpoint", "status"]
     )
     
-    HTTP_REQUEST_DURATION_SECONDS = Histogram(
+    HTTP_REQUEST_DURATION_SECONDS = _create_metric(
+        Histogram,
         "http_request_duration_seconds",
         "HTTP request latencies in seconds",
         ["method", "endpoint"]
     )
     
-    ACTIVE_REQUESTS = Gauge(
+    ACTIVE_REQUESTS = _create_metric(
+        Gauge,
         "http_active_requests",
         "Current number of active requests being processed"
     )
     
-    AI_EMBEDDING_DURATION_SECONDS = Histogram(
+    AI_EMBEDDING_DURATION_SECONDS = _create_metric(
+        Histogram,
         "ai_embedding_duration_seconds",
         "Duration of vector embedding generations in seconds"
     )
     
-    AI_LLM_DURATION_SECONDS = Histogram(
+    AI_LLM_DURATION_SECONDS = _create_metric(
+        Histogram,
         "ai_llm_duration_seconds",
         "Duration of LLM provider generations in seconds",
         ["provider", "model"]
     )
     
-    DB_QUERIES_TOTAL = Counter(
+    DB_QUERIES_TOTAL = _create_metric(
+        Counter,
         "db_queries_total",
         "Total database queries executed by application"
     )
     
-    DB_QUERY_DURATION_SECONDS = Histogram(
+    DB_QUERY_DURATION_SECONDS = _create_metric(
+        Histogram,
         "db_query_duration_seconds",
         "Database query execution duration in seconds"
     )
     
-    SYSTEM_CPU_USAGE = Gauge(
+    SYSTEM_CPU_USAGE = _create_metric(
+        Gauge,
         "system_cpu_usage",
         "System CPU usage percentage"
     )
     
-    SYSTEM_MEM_USAGE = Gauge(
+    SYSTEM_MEM_USAGE = _create_metric(
+        Gauge,
         "system_mem_usage",
         "System memory usage percentage"
     )
     
-    SYSTEM_DISK_USAGE = Gauge(
+    SYSTEM_DISK_USAGE = _create_metric(
+        Gauge,
         "system_disk_usage",
         "System root disk usage percentage"
     )
 
-    SYSTEM_THREAD_COUNT = Gauge(
+    SYSTEM_THREAD_COUNT = _create_metric(
+        Gauge,
         "system_thread_count",
         "Total active application threads"
     )
 
-    SYSTEM_FILE_DESCRIPTORS = Gauge(
+    SYSTEM_FILE_DESCRIPTORS = _create_metric(
+        Gauge,
         "system_file_descriptors",
         "Total open file descriptors or handles"
     )
 
-    EVENT_LOOP_LATENCY = Gauge(
+    EVENT_LOOP_LATENCY = _create_metric(
+        Gauge,
         "system_event_loop_latency_seconds",
         "FastAPI asyncio event loop latency in seconds"
     )
 
-    ACTIVE_USERS_GAUGE = Gauge(
+    ACTIVE_USERS_GAUGE = _create_metric(
+        Gauge,
         "active_users_count",
         "Total active unique users detected by system"
     )
 
-    HTTP_RESPONSE_SIZE_BYTES = Histogram(
+    HTTP_RESPONSE_SIZE_BYTES = _create_metric(
+        Histogram,
         "http_response_size_bytes",
         "HTTP response size in bytes"
     )
 
-    QUEUE_BACKLOG = Gauge(
+    QUEUE_BACKLOG = _create_metric(
+        Gauge,
         "task_queue_backlog",
         "Total pending tasks in queue"
     )
     
-    WORKER_ACTIVE_GAUGE = Gauge(
+    WORKER_ACTIVE_GAUGE = _create_metric(
+        Gauge,
         "task_worker_active_count",
         "Total active worker threads"
     )
     
-    TASKS_PROCESSED = Counter(
+    TASKS_PROCESSED = _create_metric(
+        Counter,
         "task_processed_total",
         "Total tasks processed",
         ["status"]
     )
-else:
-    # Fallback dummy counters/gauges with matching methods to prevent imports from crashing
-    class DummyMetric:
-        def __init__(self, *args, **kwargs): pass
-        def labels(self, *args, **kwargs): return self
-        def inc(self, *args, **kwargs): pass
-        def dec(self, *args, **kwargs): pass
-        def observe(self, *args, **kwargs): pass
-        def set(self, *args, **kwargs): pass
 
+    CACHE_HITS = _create_metric(
+        Counter,
+        "cache_hits_total",
+        "Total cache hits",
+        ["cache_type"]
+    )
+
+    CACHE_MISSES = _create_metric(
+        Counter,
+        "cache_misses_total",
+        "Total cache misses",
+        ["cache_type"]
+    )
+else:
     HTTP_REQUESTS_TOTAL = DummyMetric()
     HTTP_REQUEST_DURATION_SECONDS = DummyMetric()
     ACTIVE_REQUESTS = DummyMetric()
@@ -135,6 +181,8 @@ else:
     QUEUE_BACKLOG = DummyMetric()
     WORKER_ACTIVE_GAUGE = DummyMetric()
     TASKS_PROCESSED = DummyMetric()
+    CACHE_HITS = DummyMetric()
+    CACHE_MISSES = DummyMetric()
     
     Gauge = DummyMetric
     Counter = DummyMetric
