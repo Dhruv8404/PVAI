@@ -18,12 +18,24 @@ class LocalEmbeddingService:
         model_name = settings.EMBEDDING_MODEL
         logger.info(f"Loading local embedding model: {model_name}...")
         
+        # Check system memory to prevent OOM crash on memory-constrained servers (e.g. Render 512MB RAM)
+        try:
+            import psutil
+            total_ram = psutil.virtual_memory().total
+            if total_ram < 1.5 * 1024 * 1024 * 1024:
+                logger.warning(f"System memory ({total_ram / (1024*1024):.0f}MB) is insufficient to safely load PyTorch model. Using deterministic mock vector fallback.")
+                self._loaded = False
+                self._model = None
+                return
+        except Exception:
+            pass
+
         try:
             from sentence_transformers import SentenceTransformer
             self._model = SentenceTransformer(model_name)
             self._loaded = True
             logger.info(f"Embedding model '{model_name}' loaded successfully.")
-        except Exception as e:
+        except (ImportError, MemoryError, Exception) as e:
             logger.error(f"Failed to load sentence-transformers model '{model_name}': {e}. Graceful mock embeddings fallback will be used.")
             self._loaded = False
             self._model = None

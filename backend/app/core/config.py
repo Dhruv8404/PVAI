@@ -126,6 +126,7 @@ class Settings(BaseSettings):
     # AI and Vector Database Settings
     CHROMA_DB_PATH: str = "storage/chromadb"
     EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
+    PRELOAD_EMBEDDING_MODEL: bool = False
     LLM_PROVIDER: str = "omniroute"
     OMNIROUTE_API_KEY: str = ""
     OMNIROUTE_BASE_URL: str = ""

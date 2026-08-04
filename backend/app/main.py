@@ -239,17 +239,20 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger_startup.warning(f"ChromaDB initialization failed: {e}. Server will run with degraded/in-memory mock vector database.")
 
-        # 6. Preload SentenceTransformer embedding model (Optional - warning only)
-        from app.modules.ai.embeddings.embedding_service import embedding_service
-        try:
-            logger_startup.info(f"Preloading SentenceTransformer embedding model: {settings.EMBEDDING_MODEL}...")
-            embedding_service.load_model()
-            if embedding_service.is_loaded():
-                logger_startup.info("SentenceTransformer embedding model preloaded successfully.")
-            else:
-                logger_startup.warning("Embedding model load warning. Running with degraded mock embeddings generator.")
-        except Exception as e:
-            logger_startup.warning(f"Embedding model preloading exception: {e}. Running with degraded mock embeddings generator.")
+        # 6. Preload SentenceTransformer embedding model (Optional - skipped by default to optimize memory on 512MB RAM servers)
+        if getattr(settings, "PRELOAD_EMBEDDING_MODEL", False):
+            from app.modules.ai.embeddings.embedding_service import embedding_service
+            try:
+                logger_startup.info(f"Preloading SentenceTransformer embedding model: {settings.EMBEDDING_MODEL}...")
+                embedding_service.load_model()
+                if embedding_service.is_loaded():
+                    logger_startup.info("SentenceTransformer embedding model preloaded successfully.")
+                else:
+                    logger_startup.warning("Embedding model load warning. Running with degraded mock embeddings generator.")
+            except Exception as e:
+                logger_startup.warning(f"Embedding model preloading exception: {e}. Running with degraded mock embeddings generator.")
+        else:
+            logger_startup.info("Preloading of heavy local embedding model skipped for memory optimization. Dynamic mock/lazy fallback enabled.")
 
         # 7. Validate LLM Configuration & Connectivity (Optional - warning only)
         from app.modules.ai.providers.llm_factory import llm_factory
