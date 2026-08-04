@@ -7,13 +7,9 @@ import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Card, CardContent } from "../../components/ui/Card";
 import { 
-  FileCode, 
   UploadCloud, 
   Eye, 
   Trash2, 
-  Clock, 
-  User, 
-  FileText,
   ArrowLeft,
   Edit,
   Tag
