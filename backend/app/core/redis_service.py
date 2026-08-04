@@ -24,11 +24,11 @@ class RedisService:
             url = settings.REDIS_URL
             logger.info(f"Connecting to Redis at: {settings.REDIS_HOST}:{settings.REDIS_PORT} (DB: {settings.REDIS_DB})")
             
-            # 2s connection timeout to avoid hanging startup if Redis is down
+            # 0.5s connection timeout to avoid hanging startup if Redis is down
             self._client = redis.Redis.from_url(
                 url,
-                socket_connect_timeout=2.0,
-                socket_timeout=2.0,
+                socket_connect_timeout=0.5,
+                socket_timeout=0.5,
                 decode_responses=True
             )
             
