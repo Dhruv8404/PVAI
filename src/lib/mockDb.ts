@@ -1,4 +1,4 @@
-import type { User, DocumentTemplate, GeneratedDocument, SystemAuditLog } from '../types';
+import type { User, DocumentTemplate, GeneratedDocument, SystemAuditLog, ContactQueryItem } from '../types';
 
 // Helper to generate IDs
 const uuid = () => Math.random().toString(36).substring(2, 11);
@@ -116,8 +116,21 @@ const SEED_USERS: User[] = [
     lastLogin: '2026-06-10T17:15:00Z',
     documentsGenerated: 0,
     allowedTemplates: []
+  },
+  {
+    id: 'usr-8',
+    avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80',
+    name: 'Julian Vance',
+    email: 'julian.v@company.com',
+    role: 'User',
+    status: 'Pending',
+    createdDate: '2026-08-15T10:00:00Z',
+    lastLogin: 'Never',
+    documentsGenerated: 0,
+    allowedTemplates: ['psur']
   }
 ];
+
 
 // Seed generation history
 const SEED_DOCUMENTS: GeneratedDocument[] = [
@@ -351,6 +364,27 @@ const SEED_AUDIT_LOGS: SystemAuditLog[] = [
   }
 ];
 
+const SEED_QUERIES: ContactQueryItem[] = [
+  {
+    id: 'query-1',
+    name: 'Dr. Evelyn Reed',
+    email: 'evelyn.reed@pharmaglobal.com',
+    phone: '+1 (555) 234-5678',
+    message: 'We require custom PSUR template configuration for our oncology trial data. Could you schedule a technical walkthrough?',
+    status: 'Recent',
+    created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'query-2',
+    name: 'Robert Langdon',
+    email: 'robert.l@biotech-innovations.org',
+    phone: '+1 (555) 987-6543',
+    message: 'Inquiring about enterprise deployment options on private AWS infrastructure.',
+    status: 'Viewed',
+    created_at: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString()
+  }
+];
+
 // Initialize database in localStorage
 export const initDb = () => {
   if (!localStorage.getItem('pv_users')) {
@@ -365,7 +399,11 @@ export const initDb = () => {
   if (!localStorage.getItem('pv_audit_logs')) {
     localStorage.setItem('pv_audit_logs', JSON.stringify(SEED_AUDIT_LOGS));
   }
+  if (!localStorage.getItem('pv_queries')) {
+    localStorage.setItem('pv_queries', JSON.stringify(SEED_QUERIES));
+  }
 };
+
 
 // Mock API database service
 export const mockDb = {
@@ -506,5 +544,46 @@ export const mockDb = {
     logs.unshift(newLog);
     localStorage.setItem('pv_audit_logs', JSON.stringify(logs.slice(0, 100))); // Keep last 100 logs
     return newLog;
+  },
+
+  // CONTACT QUERIES
+  getQueries: (): ContactQueryItem[] => {
+    initDb();
+    return JSON.parse(localStorage.getItem('pv_queries') || '[]');
+  },
+  getUserQueries: (userEmail: string): ContactQueryItem[] => {
+    initDb();
+    const all = mockDb.getQueries();
+    if (!userEmail) return [];
+    return all.filter(q => q.email.toLowerCase() === userEmail.toLowerCase());
+  },
+  submitQuery: (name: string, email: string, phone: string, message: string): ContactQueryItem => {
+
+    initDb();
+    const queries = mockDb.getQueries();
+    const newQuery: ContactQueryItem = {
+      id: `query-${uuid()}`,
+      name,
+      email,
+      phone,
+      message,
+      status: 'Recent',
+      created_at: new Date().toISOString()
+    };
+    queries.unshift(newQuery);
+    localStorage.setItem('pv_queries', JSON.stringify(queries));
+    return newQuery;
+  },
+  updateQueryStatus: (queryId: string, status: 'Recent' | 'Viewed'): ContactQueryItem | null => {
+    initDb();
+    const queries = mockDb.getQueries();
+    const index = queries.findIndex(q => q.id === queryId);
+    if (index !== -1) {
+      queries[index].status = status;
+      localStorage.setItem('pv_queries', JSON.stringify(queries));
+      return queries[index];
+    }
+    return null;
   }
 };
+

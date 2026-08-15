@@ -4,7 +4,8 @@ export interface User {
   name: string;
   email: string;
   role: 'Admin' | 'User';
-  status: 'Active' | 'Inactive';
+  status: 'Active' | 'Inactive' | 'Pending';
+
   createdDate: string;
   lastLogin: string;
   documentsGenerated: number;
@@ -48,3 +49,14 @@ export interface SystemAuditLog {
   action: string;
   details: string;
 }
+
+export interface ContactQueryItem {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  message: string;
+  status: 'Recent' | 'Viewed';
+  created_at: string;
+}
+

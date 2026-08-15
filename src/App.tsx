@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -6,18 +6,30 @@ import { ToastProvider } from './components/ui/Toast';
 import { ProtectedLayout } from './components/shared/ProtectedLayout';
 import { PublicLayout } from './components/shared/PublicLayout';
 
-// Auth Pages
-import { LoginPage } from './features/auth/LoginPage';
-import { RegisterPage } from './features/auth/RegisterPage';
-import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
-import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
+// Lazy-loaded Auth Pages
+const LoginPage = lazy(() => import('./features/auth/LoginPage'));
+const RegisterPage = lazy(() => import('./features/auth/RegisterPage'));
+const ForgotPasswordPage = lazy(() => import('./features/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./features/auth/ResetPasswordPage'));
 
-// Workspace Pages
-import { DashboardPage } from './features/dashboard/DashboardPage';
-import { UsersPage } from './features/users/UsersPage';
-import { GeneratorPage } from './features/generator/GeneratorPage';
-import { HtmlTemplatesPage } from './features/generator/HtmlTemplatesPage';
-import { HistoryPage } from './features/history/HistoryPage';
+// Lazy-loaded Workspace & Admin Pages
+const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage'));
+const UsersPage = lazy(() => import('./features/users/UsersPage'));
+const GeneratorPage = lazy(() => import('./features/generator/GeneratorPage'));
+const HtmlTemplatesPage = lazy(() => import('./features/generator/HtmlTemplatesPage'));
+const HistoryPage = lazy(() => import('./features/history/HistoryPage'));
+const ContactPage = lazy(() => import('./features/contact/ContactPage'));
+const AdminQueriesPage = lazy(() => import('./features/queries/AdminQueriesPage'));
+
+// Lightweight, non-disruptive page loading fallback
+const PageLoadingFallback: React.FC = () => (
+  <div className="min-h-[50vh] flex items-center justify-center p-6">
+    <div className="flex flex-col items-center gap-3">
+      <div className="h-7 w-7 rounded-full border-3 border-indigo-600 border-t-transparent animate-spin" />
+      <span className="text-xs font-semibold text-slate-400 dark:text-zinc-500">Loading page...</span>
+    </div>
+  </div>
+);
 
 // Administrative Access guard
 const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -70,43 +82,56 @@ export const App: React.FC = () => {
       <AuthProvider>
         <ToastProvider>
           <BrowserRouter>
-            <Routes>
-              {/* Public/Auth Routes */}
-              <Route element={<PublicLayout />}>
-                <Route path="login" element={<LoginPage />} />
-                <Route path="register" element={<RegisterPage />} />
-                <Route path="forgot-password" element={<ForgotPasswordPage />} />
-                <Route path="reset-password" element={<ResetPasswordPage />} />
-              </Route>
+            <Suspense fallback={<PageLoadingFallback />}>
+              <Routes>
+                {/* Standalone Public Contact Query Form (No login or registration required) */}
+                <Route path="contact" element={<ContactPage />} />
 
-              {/* Secure Protected Workspace Routes */}
-              <Route element={<ProtectedLayout />}>
-                <Route path="dashboard" element={<DashboardPage />} />
-                <Route 
-                  path="users" 
-                  element={
-                    <AdminRoute>
-                      <UsersPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route 
-                  path="html-templates" 
-                  element={
-                    <AdminRoute>
-                      <HtmlTemplatesPage />
-                    </AdminRoute>
-                  } 
-                />
-                <Route path="generator/:templateId" element={<GeneratorPage />} />
-                <Route path="generator" element={<GeneratorPage />} />
-                <Route path="history" element={<HistoryPage />} />
-                <Route path="" element={<Navigate to="/dashboard" replace />} />
-              </Route>
+                {/* Public/Auth Routes */}
+                <Route element={<PublicLayout />}>
+                  <Route path="login" element={<LoginPage />} />
+                  <Route path="register" element={<RegisterPage />} />
+                  <Route path="forgot-password" element={<ForgotPasswordPage />} />
+                  <Route path="reset-password" element={<ResetPasswordPage />} />
+                </Route>
 
-              {/* Catch All */}
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
+                {/* Secure Protected Workspace Routes */}
+                <Route element={<ProtectedLayout />}>
+                  <Route path="dashboard" element={<DashboardPage />} />
+                  <Route 
+                    path="users" 
+                    element={
+                      <AdminRoute>
+                        <UsersPage />
+                      </AdminRoute>
+                    } 
+                  />
+                  <Route 
+                    path="html-templates" 
+                    element={
+                      <AdminRoute>
+                        <HtmlTemplatesPage />
+                      </AdminRoute>
+                    } 
+                  />
+                  <Route 
+                    path="admin/queries" 
+                    element={
+                      <AdminRoute>
+                        <AdminQueriesPage />
+                      </AdminRoute>
+                    } 
+                  />
+                  <Route path="generator/:templateId" element={<GeneratorPage />} />
+                  <Route path="generator" element={<GeneratorPage />} />
+                  <Route path="history" element={<HistoryPage />} />
+                  <Route path="" element={<Navigate to="/dashboard" replace />} />
+                </Route>
+
+                {/* Catch All */}
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </Suspense>
           </BrowserRouter>
         </ToastProvider>
       </AuthProvider>
@@ -114,3 +139,4 @@ export const App: React.FC = () => {
   );
 };
 export default App;
+

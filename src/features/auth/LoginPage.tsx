@@ -151,15 +151,24 @@ export const LoginPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <div className="text-center mt-6">
+      <div className="text-center mt-6 space-y-2">
         <p className="text-xs font-medium text-slate-500 dark:text-zinc-400">
           New here?{' '}
           <Link to="/register" className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline">
             Create an Account
           </Link>
         </p>
+
+        <p className="text-xs font-medium text-slate-500 dark:text-zinc-400">
+          Have a question or request?{' '}
+          <Link to="/contact" className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline">
+            Submit Public Query Form
+          </Link>
+          {' '}<span className="text-[10px] text-slate-400">(No account required)</span>
+        </p>
       </div>
     </div>
   );
 };
+
 export default LoginPage;

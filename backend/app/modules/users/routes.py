@@ -153,6 +153,21 @@ async def activate_user(
     )
 
 
+@router.post("/{id}/approve", response_model=ApiResponse[UserResponse], dependencies=[Depends(require_admin)])
+async def approve_user(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    user = await user_service.toggle_status(db, id, "Active")
+    await db.commit()
+    return ApiResponse(
+        success=True,
+        message="User registration request approved successfully",
+        data=UserResponse.model_validate(user)
+    )
+
+
+
 @router.post("/{id}/reset-password", response_model=ApiResponse[dict], dependencies=[Depends(require_admin)])
 async def reset_password(
     id: uuid.UUID,

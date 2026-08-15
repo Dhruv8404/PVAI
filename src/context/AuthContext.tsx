@@ -158,17 +158,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       const json = await res.json();
       
-      if (!json.success) {
+      if (!res.ok || !json.success) {
         throw new Error(json.message || 'Registration failed.');
       }
       
-      // Automatically log in after registration
-      return await login(email, password);
+      setLoading(false);
+      return true;
     } catch (err: any) {
+      // If API fetch failed or server returned error, check mockDb fallback if API server is unreachable
+      if (err.message === 'Failed to fetch') {
+        const users = mockDb.getUsers();
+        if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+          setLoading(false);
+          throw new Error('Email address already registered.');
+        }
+
+        const newUser: User = {
+          id: `usr-${Date.now()}`,
+          name,
+          email,
+          role: 'User',
+          status: 'Pending',
+          createdDate: new Date().toISOString().split('T')[0],
+          lastLogin: 'Never',
+          documentsGenerated: 0,
+          reportLimit: 5,
+          allowedTemplates: []
+        };
+        mockDb.saveUser(newUser);
+        setLoading(false);
+        return true;
+      }
+
       setLoading(false);
       throw err;
     }
   };
+
 
   const logout = () => {
     if (user) {

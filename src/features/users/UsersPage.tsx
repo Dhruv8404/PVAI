@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '../../lib/resolver';
 import * as z from 'zod';
@@ -32,12 +33,15 @@ import { Drawer } from '../../components/ui/Drawer';
 import { useToast } from '../../components/ui/Toast';
 import { API_BASE_URL } from '../../config';
 import { ConfirmDialog } from '../../components/shared/ConfirmDialog';
+import { mockDb } from '../../lib/mockDb';
+
+
 
 const userSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().min(1, 'Email is required').email('Must be a valid email'),
   role: z.enum(['Admin', 'User']),
-  status: z.enum(['Active', 'Inactive']),
+  status: z.enum(['Active', 'Inactive', 'Pending']),
   reportLimit: z.coerce.number().min(1, 'Limit must be at least 1').default(5),
   allowedTemplates: z.array(z.string()).default([])
 });
@@ -54,8 +58,9 @@ export const UsersPage: React.FC = () => {
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<'All' | 'Admin' | 'User'>('All');
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Inactive'>('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Active' | 'Inactive'>('All');
   const [showFilters, setShowFilters] = useState(false);
+
 
   // Sorting
   const [sortBy, setSortBy] = useState<'name' | 'email' | 'created' | 'docs'>('name');
@@ -195,13 +200,47 @@ export const UsersPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error('API error in user directory loader:', err.message);
-      setLoading(false);
     }
+    // Fallback to local mockDb
+    setUsers(mockDb.getUsers());
+    setLoading(false);
   };
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // Handle approving pending user registration
+  const handleApproveUser = async (userId: string) => {
+    try {
+      const token = localStorage.getItem('pv_token');
+      if (token) {
+        const res = await fetch(`${API_BASE_URL}/users/${userId}/approve`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const json = await res.json();
+        if (json.success) {
+          toast.success('User registration approved! Account is now Active.', 'User Approved');
+          loadData();
+          return;
+        }
+      }
+    } catch (err: any) {
+      console.error('API approval error:', err);
+    }
+    // Fallback to mockDb update
+    const allUsers = mockDb.getUsers();
+    const target = allUsers.find((u: User) => u.id === userId);
+    if (target) {
+      target.status = 'Active';
+      mockDb.saveUser(target);
+      toast.success(`User ${target.name} approved! Account activated.`, 'Registration Approved');
+      loadData();
+    }
+  };
+
+
 
   // Form Submit (Create or Edit User)
   const onSubmit = async (data: UserFormData) => {
@@ -463,31 +502,37 @@ export const UsersPage: React.FC = () => {
     toast.info('Export file package initiated.', 'CSV Exported');
   };
 
-  // Filtered and Sorted list
-  const filteredUsers = users.filter(u => {
-    const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          u.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = roleFilter === 'All' || u.role === roleFilter;
-    const matchesStatus = statusFilter === 'All' || u.status === statusFilter;
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+  // Memoized Filtered, Sorted, and Paginated list
+  const filteredUsers = useMemo(() => {
+    const qStr = searchQuery.toLowerCase().trim();
+    return users.filter(u => {
+      const matchesSearch = !qStr || u.name.toLowerCase().includes(qStr) || u.email.toLowerCase().includes(qStr);
+      const matchesRole = roleFilter === 'All' || u.role === roleFilter;
+      const matchesStatus = statusFilter === 'All' || u.status === statusFilter;
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+  }, [users, searchQuery, roleFilter, statusFilter]);
 
-  const sortedUsers = [...filteredUsers].sort((a, b) => {
-    let comparison = 0;
-    if (sortBy === 'name') comparison = a.name.localeCompare(b.name);
-    else if (sortBy === 'email') comparison = a.email.localeCompare(b.email);
-    else if (sortBy === 'created') comparison = a.createdDate.localeCompare(b.createdDate);
-    else if (sortBy === 'docs') comparison = a.documentsGenerated - b.documentsGenerated;
+  const sortedUsers = useMemo(() => {
+    return [...filteredUsers].sort((a, b) => {
+      let comparison = 0;
+      if (sortBy === 'name') comparison = a.name.localeCompare(b.name);
+      else if (sortBy === 'email') comparison = a.email.localeCompare(b.email);
+      else if (sortBy === 'created') comparison = a.createdDate.localeCompare(b.createdDate);
+      else if (sortBy === 'docs') comparison = a.documentsGenerated - b.documentsGenerated;
 
-    return sortOrder === 'asc' ? comparison : -comparison;
-  });
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+  }, [filteredUsers, sortBy, sortOrder]);
 
   // Pagination calculation
   const totalPages = Math.ceil(sortedUsers.length / rowsPerPage) || 1;
-  const paginatedUsers = sortedUsers.slice(
-    (currentPage - 1) * rowsPerPage,
-    currentPage * rowsPerPage
-  );
+  const paginatedUsers = useMemo(() => {
+    return sortedUsers.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+  }, [sortedUsers, currentPage, rowsPerPage]);
+
+  const pendingUsers = useMemo(() => users.filter(u => u.status === 'Pending'), [users]);
+
 
   return (
     <div className="space-y-6">
@@ -498,7 +543,7 @@ export const UsersPage: React.FC = () => {
             User Workspace Directory
           </h1>
           <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 font-medium">
-            Configure roles, allocate document access filters, and inspect profile histories.
+            Configure roles, allocate document access filters, approve pending user registrations, and inspect profile histories.
           </p>
         </div>
 
@@ -531,16 +576,29 @@ export const UsersPage: React.FC = () => {
       </div>
 
       {/* Quick Stats Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-4 flex items-center justify-between">
           <div className="text-left">
-            <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Total Users</span>
+            <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Total Seats</span>
             <h3 className="text-xl font-black text-slate-900 dark:text-zinc-50 mt-1">{users.length}</h3>
           </div>
           <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
             <Users className="h-5 w-5" />
           </div>
         </Card>
+
+        <Card className="p-4 flex items-center justify-between border-amber-200 dark:border-amber-900/50 bg-amber-50/20 dark:bg-amber-950/10">
+          <div className="text-left">
+            <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Pending Approval</span>
+            <h3 className="text-xl font-black text-amber-600 dark:text-amber-400 mt-1">
+              {pendingUsers.length}
+            </h3>
+          </div>
+          <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="h-5 w-5" />
+          </div>
+        </Card>
+
         <Card className="p-4 flex items-center justify-between">
           <div className="text-left">
             <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Active Users</span>
@@ -552,6 +610,7 @@ export const UsersPage: React.FC = () => {
             <UserCheck className="h-5 w-5" />
           </div>
         </Card>
+
         <Card className="p-4 flex items-center justify-between">
           <div className="text-left">
             <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Suspended Users</span>
@@ -564,6 +623,47 @@ export const UsersPage: React.FC = () => {
           </div>
         </Card>
       </div>
+
+      {/* PENDING REGISTRATION APPROVAL QUEUE BANNER */}
+      {pendingUsers.length > 0 && (
+        <div className="bg-amber-500/10 dark:bg-amber-950/40 border border-amber-300/80 dark:border-amber-800/80 rounded-2xl p-5 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="px-2 py-0.5 rounded-full bg-amber-500 text-white font-extrabold text-xs">
+                {pendingUsers.length}
+              </div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-50">
+                Pending Registration Approval Requests
+              </h3>
+            </div>
+            <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+              Admin Action Required
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {pendingUsers.map(pUser => (
+              <div key={pUser.id} className="bg-white dark:bg-zinc-900 border border-amber-200/80 dark:border-zinc-800 rounded-xl p-3.5 flex items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <Avatar src={pUser.avatarUrl} name={pUser.name} size="sm" />
+                  <div className="truncate">
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-zinc-50 truncate">{pUser.name}</h4>
+                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 truncate">{pUser.email}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleApproveUser(pUser.id)}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0"
+                >
+                  <UserCheck className="h-3.5 w-3.5" />
+                  <span>Approve User</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
 
       {/* Main Table Card wrapper */}
       <Card>
@@ -656,12 +756,12 @@ export const UsersPage: React.FC = () => {
 
               <div>
                 <span className="block text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Filter Status</span>
-                <div className="flex gap-2">
-                  {['All', 'Active', 'Inactive'].map(status => (
+                <div className="flex flex-wrap gap-2">
+                  {['All', 'Pending', 'Active', 'Inactive'].map(status => (
                     <button
                       key={status}
                       onClick={() => { setStatusFilter(status as any); setCurrentPage(1); }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                         statusFilter === status 
                           ? 'bg-indigo-600 border-indigo-600 text-white dark:bg-indigo-500 dark:border-indigo-500' 
                           : 'bg-white border-slate-200 text-slate-700 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-300'
@@ -672,6 +772,7 @@ export const UsersPage: React.FC = () => {
                   ))}
                 </div>
               </div>
+
             </div>
           )}
         </CardHeader>
@@ -749,7 +850,7 @@ export const UsersPage: React.FC = () => {
                       </Badge>
                     </td>
                     <td className="px-5 py-3.5">
-                      <Badge variant={u.status === 'Active' ? 'success' : 'danger'}>
+                      <Badge variant={u.status === 'Active' ? 'success' : u.status === 'Pending' ? 'warning' : 'danger'}>
                         {u.status}
                       </Badge>
                     </td>
@@ -760,7 +861,18 @@ export const UsersPage: React.FC = () => {
                       {u.documentsGenerated}
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      <div className="flex justify-end gap-1.5">
+                      <div className="flex justify-end items-center gap-1.5">
+                        {u.status === 'Pending' && (
+                          <button
+                            onClick={() => handleApproveUser(u.id)}
+                            className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-xs cursor-pointer"
+                            title="Approve User Registration"
+                          >
+                            <UserCheck className="h-3.5 w-3.5" />
+                            <span>Approve</span>
+                          </button>
+                        )}
+
                         <button 
                           onClick={() => setProfileUser(u)}
                           className="p-1 rounded hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-500 dark:text-zinc-400"
@@ -809,7 +921,7 @@ export const UsersPage: React.FC = () => {
                           >
                             <UserMinus className="h-4 w-4" />
                           </button>
-                        ) : (
+                        ) : u.status === 'Inactive' ? (
                           <button 
                             onClick={() => triggerConfirm(
                               'activate',
@@ -822,7 +934,8 @@ export const UsersPage: React.FC = () => {
                           >
                             <UserCheck className="h-4 w-4" />
                           </button>
-                        )}
+                        ) : null}
+
 
                         <button 
                           onClick={() => triggerConfirm(

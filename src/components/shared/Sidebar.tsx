@@ -11,8 +11,12 @@ import {
   ChevronDown,
   ChevronUp,
   ShieldCheck,
-  FileCode
+  FileCode,
+  MessageSquare,
+  Inbox
 } from 'lucide-react';
+
+
 import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../config';
 
@@ -76,6 +80,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed })
       roles: ['Admin']
     },
     {
+      name: 'Admin Queries Inbox',
+      path: '/admin/queries',
+      icon: Inbox,
+      roles: ['Admin']
+    },
+
+    {
       name: 'Document Generator',
       path: '/generator',
       icon: FileText,
@@ -86,8 +97,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, setIsCollapsed })
       path: '/history',
       icon: History,
       roles: ['Admin', 'User']
+    },
+    {
+      name: 'Inquiry Queries',
+      path: '/contact',
+      icon: MessageSquare,
+      roles: ['Admin', 'User']
     }
   ];
+
+
+
 
   const filteredItems = navItems.filter(item => item.roles.includes(user?.role || ''));
 

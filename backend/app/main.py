@@ -29,12 +29,14 @@ from app.modules.documents.routes import router as documents_router
 from app.modules.downloads.routes import router as downloads_router
 from app.modules.dashboard.routes import router as dashboard_router
 from app.modules.ops.routes import router as ops_router
-
+from app.modules.queries.routes import router as queries_router
 
 
 # Import models for seeding
 from app.modules.users.model import User, Role, Permission
 from app.modules.templates.model import DocumentTemplate, HtmlTemplate, AIConfiguration
+from app.modules.queries.model import ContactQuery
+
 
 
 async def async_startup_tasks():
@@ -324,6 +326,7 @@ app.include_router(documents_router, prefix=settings.API_V1_STR)
 app.include_router(downloads_router, prefix=settings.API_V1_STR)
 app.include_router(dashboard_router, prefix=settings.API_V1_STR)
 app.include_router(ops_router, prefix=settings.API_V1_STR)
+app.include_router(queries_router, prefix=settings.API_V1_STR)
 
 
 

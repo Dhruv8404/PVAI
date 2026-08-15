@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '../../lib/resolver';
 import * as z from 'zod';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
@@ -24,9 +24,11 @@ type RegisterForm = z.infer<typeof registerSchema>;
 export const RegisterPage: React.FC = () => {
   const { register: signup } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
   const [pwdValue, setPwdValue] = useState('');
 
   const { register, handleSubmit, formState: { errors } } = useForm<RegisterForm>({
@@ -62,8 +64,9 @@ export const RegisterPage: React.FC = () => {
     setSubmitting(true);
     try {
       await signup(data.name, data.email, data.password);
-      toast.success('Account created successfully.', 'Welcome to PV Portal!');
-      navigate('/dashboard');
+      setRegisteredEmail(data.email);
+      setSubmitted(true);
+      toast.success('Registration request sent successfully! An administrator will review and approve your account.', 'Request Sent');
     } catch (err: any) {
       toast.error(err.message || 'Onboarding failed.', 'Registration Failed');
     } finally {
@@ -71,8 +74,47 @@ export const RegisterPage: React.FC = () => {
     }
   };
 
+
+  if (submitted) {
+    return (
+      <div className="w-full max-w-md mx-auto px-4 text-center">
+        <div className="inline-flex p-3 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 shadow-md mb-4">
+          <ShieldCheck className="h-8 w-8" />
+        </div>
+        <h2 className="text-xl font-extrabold text-slate-900 dark:text-zinc-50 tracking-tight">
+          Registration Request Sent
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-zinc-400 mt-2 leading-relaxed">
+          Thank you for signing up (<span className="font-bold text-slate-700 dark:text-zinc-300">{registeredEmail}</span>). Your request has been sent to the Administrator.
+        </p>
+
+        <Card className="mt-6 border-amber-200 dark:border-amber-900/50 bg-amber-50/30 dark:bg-amber-950/20">
+          <CardContent className="p-5 text-xs text-amber-800 dark:text-amber-300 leading-relaxed font-medium space-y-2">
+            <p>
+              🔒 <strong>Approval Required:</strong> Your registration request was sent successfully. An administrator will review and approve your account before you can log in.
+            </p>
+            <p className="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">
+              Once approved by the Admin, you will be able to log in using your email and password.
+            </p>
+          </CardContent>
+        </Card>
+
+        <div className="mt-6">
+          <Link
+            to="/login"
+            className="inline-flex items-center justify-center w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors shadow-md"
+          >
+            Go to Login Page
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+
   return (
     <div className="w-full max-w-md mx-auto px-4">
+
       <div className="text-center mb-8">
         <div className="inline-flex p-2.5 rounded-2xl bg-indigo-600 dark:bg-indigo-500 text-white shadow-md mb-3">
           <ShieldCheck className="h-7 w-7" />

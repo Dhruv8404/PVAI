@@ -27,9 +27,10 @@ async def register(
     await db.commit()
     return ApiResponse(
         success=True,
-        message="Account registered successfully. Verify login credentials",
+        message="Registration request sent successfully. An administrator will review and approve your account before you can log in.",
         data={"id": str(user.id), "email": user.email, "name": user.name}
     )
+
 
 
 @router.post("/login", response_model=ApiResponse[TokenResponse])

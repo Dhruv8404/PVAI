@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
@@ -78,19 +79,23 @@ export const DashboardPage: React.FC = () => {
   }, [user]);
 
 
-// test reson
-  // Graph Data points for Daily Documents
-  const dailyGenData = chartsData?.daily_documents || [
-    { label: 'Mon', value: 0 },
-    { label: 'Tue', value: 0 },
-    { label: 'Wed', value: 0 },
-    { label: 'Thu', value: 0 },
-    { label: 'Fri', value: 0 },
-    { label: 'Sat', value: 0 },
-    { label: 'Sun', value: 0 },
-  ];
+  // Graph Data points for Daily Documents memoized
+  const dailyGenData = useMemo(() => {
+    return chartsData?.daily_documents || [
+      { label: 'Mon', value: 0 },
+      { label: 'Tue', value: 0 },
+      { label: 'Wed', value: 0 },
+      { label: 'Thu', value: 0 },
+      { label: 'Fri', value: 0 },
+      { label: 'Sat', value: 0 },
+      { label: 'Sun', value: 0 },
+    ];
+  }, [chartsData?.daily_documents]);
 
-  const maxGenValue = Math.max(...dailyGenData.map((d: any) => d.value)) || 1;
+  const maxGenValue = useMemo(() => {
+    return Math.max(...dailyGenData.map((d: any) => d.value)) || 1;
+  }, [dailyGenData]);
+
 
 
 

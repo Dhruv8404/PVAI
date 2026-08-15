@@ -27,6 +27,9 @@ class AuthService:
         if not verify_password(password, user.hashed_password):
             raise AuthException("Incorrect email or password combination")
             
+        if user.status == "Pending":
+            raise AuthException("Your registration request is pending admin approval. Please wait for an administrator to approve your account.")
+
         if user.status != "Active":
             raise AuthException("Your account is deactivated. Contact administrator")
 
@@ -47,9 +50,10 @@ class AuthService:
             name=register_data.name,
             password=register_data.password,
             role="User",
-            status="Active",
+            status="Pending",
             allowed_templates=[] # Empty by default, admin allocates
         )
+
         
         return await user_repository.create_user(db, obj_in=user_in)
 

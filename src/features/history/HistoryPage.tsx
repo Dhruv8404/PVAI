@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+
 import { useSearchParams } from 'react-router-dom';
 import { 
   Search, 
@@ -242,57 +243,65 @@ export const HistoryPage: React.FC = () => {
   };
 
   // Get unique templates versions and report types for dropdowns
-  const uniqueVersions = Array.from(new Set(documents.map(d => d.version).filter(Boolean)));
-  const uniqueTypes = Array.from(new Set(documents.map(d => d.reportType).filter(Boolean)));
+  const uniqueVersions = useMemo(() => Array.from(new Set(documents.map(d => d.version).filter(Boolean))), [documents]);
+  const uniqueTypes = useMemo(() => Array.from(new Set(documents.map(d => d.reportType).filter(Boolean))), [documents]);
 
   // Filters logic
-  const filteredDocs = documents.filter(doc => {
-    // If not admin, user can only see their own generated documents
-    const matchesUser = user?.role === 'Admin' || doc.createdById === user?.id;
+  const filteredDocs = useMemo(() => {
+    const qStr = searchQuery.toLowerCase().trim();
+    return documents.filter(doc => {
+      // If not admin, user can only see their own generated documents
+      const matchesUser = user?.role === 'Admin' || doc.createdById === user?.id;
 
-    // The History Vault should ONLY display successfully generated reports
-    const matchesStatus = doc.status === 'Success';
+      // The History Vault should ONLY display successfully generated reports
+      const matchesStatus = doc.status === 'Success';
 
-    // Search matches Report Name, Template Name, and Date
-    const formattedDate = new Date(doc.generatedTime).toLocaleDateString().toLowerCase();
-    const formattedDateTime = new Date(doc.generatedTime).toLocaleString().toLowerCase();
-    const customFormatted = formatVaultTimestamp(doc.generatedTime).toLowerCase();
-    const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          doc.templateName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          formattedDate.includes(searchQuery.toLowerCase()) ||
-                          formattedDateTime.includes(searchQuery.toLowerCase()) ||
-                          customFormatted.includes(searchQuery.toLowerCase()) ||
-                          doc.excelFileName.toLowerCase().includes(searchQuery.toLowerCase());
+      // Search matches Report Name, Template Name, and Date
+      let matchesSearch = true;
+      if (qStr) {
+        const formattedDate = new Date(doc.generatedTime).toLocaleDateString().toLowerCase();
+        const formattedDateTime = new Date(doc.generatedTime).toLocaleString().toLowerCase();
+        const customFormatted = formatVaultTimestamp(doc.generatedTime).toLowerCase();
+        matchesSearch = doc.name.toLowerCase().includes(qStr) ||
+                        doc.templateName.toLowerCase().includes(qStr) ||
+                        formattedDate.includes(qStr) ||
+                        formattedDateTime.includes(qStr) ||
+                        customFormatted.includes(qStr) ||
+                        doc.excelFileName.toLowerCase().includes(qStr);
+      }
 
-    const matchesTemplate = templateFilter === 'All' || doc.templateId === templateFilter;
+      const matchesTemplate = templateFilter === 'All' || doc.templateId === templateFilter;
 
-    // Date filter: Today, Last 7 Days, Last 30 Days
-    let matchesDate = true;
-    const docDate = new Date(doc.generatedTime);
-    const now = new Date();
-    if (dateFilter === 'Today') {
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      matchesDate = docDate >= todayStart;
-    } else if (dateFilter === 'Last7Days') {
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      matchesDate = docDate >= sevenDaysAgo;
-    } else if (dateFilter === 'Last30Days') {
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      matchesDate = docDate >= thirtyDaysAgo;
-    }
+      // Date filter: Today, Last 7 Days, Last 30 Days
+      let matchesDate = true;
+      if (dateFilter !== 'All') {
+        const docDate = new Date(doc.generatedTime);
+        const now = new Date();
+        if (dateFilter === 'Today') {
+          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          matchesDate = docDate >= todayStart;
+        } else if (dateFilter === 'Last7Days') {
+          const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          matchesDate = docDate >= sevenDaysAgo;
+        } else if (dateFilter === 'Last30Days') {
+          const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          matchesDate = docDate >= thirtyDaysAgo;
+        }
+      }
 
-    const matchesVersion = versionFilter === 'All' || doc.version === versionFilter;
-    const matchesType = typeFilter === 'All' || doc.reportType === typeFilter;
+      const matchesVersion = versionFilter === 'All' || doc.version === versionFilter;
+      const matchesType = typeFilter === 'All' || doc.reportType === typeFilter;
 
-    return matchesUser && matchesStatus && matchesSearch && matchesTemplate && matchesDate && matchesVersion && matchesType;
-  });
+      return matchesUser && matchesStatus && matchesSearch && matchesTemplate && matchesDate && matchesVersion && matchesType;
+    });
+  }, [documents, user?.role, user?.id, searchQuery, templateFilter, dateFilter, versionFilter, typeFilter]);
 
   // Pagination calculation
   const totalPages = Math.ceil(filteredDocs.length / rowsPerPage) || 1;
-  const paginatedDocs = filteredDocs.slice(
-    (currentPage - 1) * rowsPerPage,
-    currentPage * rowsPerPage
-  );
+  const paginatedDocs = useMemo(() => {
+    return filteredDocs.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+  }, [filteredDocs, currentPage, rowsPerPage]);
+
 
   return (
     <div className="space-y-6">
