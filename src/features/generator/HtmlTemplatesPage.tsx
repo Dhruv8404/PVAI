@@ -254,8 +254,7 @@ export const HtmlTemplatesPage: React.FC = () => {
   const handlePreview = async (id: string, name: string) => {
     try {
       const token = localStorage.getItem("pv_token");
-      const specUrl = API_BASE_URL.replace("/api/v1", "/api");
-      const res = await fetch(`${specUrl}/templates/${id}/`, {
+      const res = await fetch(`${API_BASE_URL}/admin/templates/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const json = await res.json();

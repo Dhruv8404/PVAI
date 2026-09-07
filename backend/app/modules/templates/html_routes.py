@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import shutil
 import urllib.request
@@ -46,6 +47,34 @@ require_admin = RoleRequirement(["Admin"])
 
 
 # Helper to read HTML content safely (supports local files and Cloudinary URL targets)
+def sanitize_html_for_user(raw_html: str) -> str:
+    """Strips script tags and embedded JavaScript code to prevent source exposure to users."""
+    if not raw_html:
+        return ""
+    clean_html = re.sub(r'<script\b[^<]*(?:(?!</script>)<[^<]*)*</script>', '', raw_html, flags=re.IGNORECASE)
+    clean_html = re.sub(r'\s+on[a-z]+\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)', '', clean_html, flags=re.IGNORECASE)
+    return clean_html
+
+
+def sanitize_template_for_user(data: Any, user: Optional[User]) -> Any:
+    user_roles = [r.name for r in user.roles] if user and hasattr(user, 'roles') else []
+    if "Admin" not in user_roles:
+        if isinstance(data, list):
+            for item in data:
+                if hasattr(item, "html_file"):
+                    item.html_file = "[PROTECTED]"
+                if hasattr(item, "file_url"):
+                    item.file_url = None
+        else:
+            if hasattr(data, "html_file"):
+                data.html_file = "[PROTECTED]"
+            if hasattr(data, "file_url"):
+                data.file_url = None
+            if hasattr(data, "html_content") and data.html_content:
+                data.html_content = sanitize_html_for_user(data.html_content)
+    return data
+
+
 def read_html_content(filepath: str) -> str:
     if not filepath:
         raise HTTPException(
@@ -135,7 +164,7 @@ async def list_html_templates(
 
 @admin_router.get("/{id}", response_model=ApiResponse[HtmlTemplateDetailResponse], dependencies=[Depends(require_admin)])
 async def get_html_template_detail(
-    id: uuid.UUID,
+    id: str,
     db: AsyncSession = Depends(get_db)
 ):
     try:
@@ -143,7 +172,7 @@ async def get_html_template_detail(
         html_content = read_html_content(tpl.html_file)
         
         # Get related fields
-        stmt_fields = select(TemplateField).where(TemplateField.template_id == id)
+        stmt_fields = select(TemplateField).where(TemplateField.template_id == tpl.id)
         res_fields = await db.execute(stmt_fields)
         fields_list = res_fields.scalars().all()
         
@@ -270,6 +299,7 @@ async def get_current_active_template(
         html_content=html_content,
         fields=[TemplateFieldResponse.model_validate(f) for f in fields_list]
     )
+    response_data = sanitize_template_for_user(response_data, _current_user)
     return ApiResponse(
         success=True,
         message="Current active template fetched successfully",
@@ -395,7 +425,9 @@ async def spec_list_html_templates(
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user)
 ):
-    return await list_html_templates(db)
+    res = await list_html_templates(db)
+    res.data = sanitize_template_for_user(res.data, _current_user)
+    return res
 
 
 @spec_router.get("/active/", response_model=ApiResponse[HtmlTemplateDetailResponse])
@@ -410,11 +442,13 @@ async def spec_get_active_template(
 @spec_router.get("/{id}/", response_model=ApiResponse[HtmlTemplateDetailResponse])
 @spec_router.get("/{id}", response_model=ApiResponse[HtmlTemplateDetailResponse])
 async def spec_get_template_detail(
-    id: uuid.UUID,
+    id: str,
     db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user)
 ):
-    return await get_html_template_detail(id, db)
+    res = await get_html_template_detail(id, db)
+    res.data = sanitize_template_for_user(res.data, _current_user)
+    return res
 
 
 @spec_router.get("/{id}/fields", response_model=ApiResponse[List[TemplateFieldResponse]])

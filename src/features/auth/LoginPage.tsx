@@ -132,22 +132,7 @@ export const LoginPage: React.FC = () => {
             </Button>
           </form>
 
-          {/* Quick seeded logins shortcut helper */}
-          <div className="mt-5 pt-4 border-t border-slate-100 dark:border-zinc-800 text-left">
-            <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider block mb-2">Quick Access Demo Accounts</span>
-            <div className="grid grid-cols-2 gap-2 text-[10px] font-semibold">
-              <div className="p-2 bg-slate-50 dark:bg-zinc-850 border border-slate-150 dark:border-zinc-800 rounded">
-                <span className="text-slate-500 block">Admin role:</span>
-                <span className="text-slate-900 dark:text-zinc-200">admin@company.com</span>
-                <span className="text-slate-400 block mt-0.5">Password123!</span>
-              </div>
-              <div className="p-2 bg-slate-50 dark:bg-zinc-850 border border-slate-150 dark:border-zinc-800 rounded">
-                <span className="text-slate-500 block">User role:</span>
-                <span className="text-slate-900 dark:text-zinc-200">user@company.com</span>
-                <span className="text-slate-400 block mt-0.5">Password123!</span>
-              </div>
-            </div>
-          </div>
+
         </CardContent>
       </Card>
 

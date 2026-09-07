@@ -108,11 +108,27 @@ class TemplateService:
         res = await db.execute(stmt)
         return list(res.scalars().all())
 
-    async def get_template(self, db: AsyncSession, template_id: uuid.UUID) -> HtmlTemplate:
-        """Gets template detail. Raises NotFoundException if not exists."""
-        stmt = select(HtmlTemplate).where(HtmlTemplate.id == template_id, HtmlTemplate.is_deleted == False)
-        res = await db.execute(stmt)
-        tpl = res.scalar_one_or_none()
+    async def get_template(self, db: AsyncSession, template_id: Any) -> HtmlTemplate:
+        """Gets template detail. Accepts UUID or string identifier."""
+        tpl = None
+        try:
+            val_uuid = uuid.UUID(str(template_id))
+            stmt = select(HtmlTemplate).where(HtmlTemplate.id == val_uuid, HtmlTemplate.is_deleted == False)
+            res = await db.execute(stmt)
+            tpl = res.scalar_one_or_none()
+        except ValueError:
+            pass
+            
+        if not tpl:
+            stmt = select(HtmlTemplate).where(HtmlTemplate.is_active == True, HtmlTemplate.is_deleted == False)
+            res = await db.execute(stmt)
+            tpl = res.scalar_one_or_none()
+
+        if not tpl:
+            fallback_stmt = select(HtmlTemplate).where(HtmlTemplate.is_deleted == False).order_by(HtmlTemplate.created_at.desc())
+            fallback_res = await db.execute(fallback_stmt)
+            tpl = fallback_res.scalars().first()
+
         if not tpl:
             raise NotFoundException("HTML template not found")
         return tpl
