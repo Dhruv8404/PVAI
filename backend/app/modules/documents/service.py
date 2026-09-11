@@ -1,6 +1,10 @@
+import os
 import uuid
 import time
-from typing import List, Optional
+import logging
+from typing import List, Optional, Any
+
+logger = logging.getLogger(__name__)
 from fastapi import UploadFile
 from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,13 +27,9 @@ class DocumentService:
         template_id: uuid.UUID,
         uploaded_file: UploadFile
     ) -> GeneratedDocument:
-        # Check template access permissions
-        user_templates_ids = [t.id for t in user.allowed_templates]
         user_roles = [r.name for r in user.roles]
-        
-        # Admin can access all templates, User must be authorized
-        if "Admin" not in user_roles and template_id not in user_templates_ids:
-            raise ForbiddenException("You do not have access rights to launch this generator template")
+        if user.status != "Active":
+            raise ForbiddenException("Your user account is not active. Please contact an administrator.")
 
         # Enforce Report Generation Limits for standard Users
         if "Admin" not in user_roles:
@@ -152,7 +152,7 @@ class DocumentService:
         db: AsyncSession,
         *,
         user: User,
-        template_id: uuid.UUID,
+        template_id: Any,
         excel_file_name: str,
         report_type: str = "PSUR",
         report_content: str = "",
@@ -163,13 +163,26 @@ class DocumentService:
     ) -> GeneratedDocument:
         from app.modules.templates.model import HtmlTemplate
 
-        # Debug print
-        print(f"[DEBUG_TOKEN] Received template_id: {template_id} (Type: {type(template_id)})")
-        
         # Resolve HTML template
-        stmt = select(HtmlTemplate).where(HtmlTemplate.id == template_id, HtmlTemplate.is_deleted == False)
-        res = await db.execute(stmt)
-        tpl = res.scalar_one_or_none()
+        tpl = None
+        try:
+            val_uuid = uuid.UUID(str(template_id))
+            stmt = select(HtmlTemplate).where(HtmlTemplate.id == val_uuid, HtmlTemplate.is_deleted == False)
+            res = await db.execute(stmt)
+            tpl = res.scalar_one_or_none()
+        except ValueError:
+            pass
+
+        if not tpl:
+            stmt = select(HtmlTemplate).where(HtmlTemplate.is_active == True, HtmlTemplate.is_deleted == False)
+            res = await db.execute(stmt)
+            tpl = res.scalar_one_or_none()
+
+        if not tpl:
+            fallback_stmt = select(HtmlTemplate).where(HtmlTemplate.is_deleted == False).order_by(HtmlTemplate.created_at.desc())
+            fallback_res = await db.execute(fallback_stmt)
+            tpl = fallback_res.scalars().first()
+
         if not tpl:
             raise NotFoundException("HTML template not found")
 
@@ -227,15 +240,15 @@ class DocumentService:
                 id=uuid.uuid4(),
                 user_id=user.id,
                 template_id=None,
-                html_template_id=template_id,
-                template_name=tpl.name,
-                name=f"{tpl.name.upper()}_{report_type}_Report_{new_date_label()}",
+                html_template_id=tpl.id if tpl else None,
+                template_name=tpl.name if tpl else "HTML Drafting Studio",
+                name=f"{(tpl.name.upper() if tpl else 'REPORT')}_{report_type}_Report_{new_date_label()}",
                 excel_file_name=excel_file_name,
                 html_path=saved_html_path,
                 pdf_path=None,
                 status=status,
                 execution_time_ms=0,
-                template_version=tpl.version if tpl.version else "1.0.0",
+                template_version=tpl.version if (tpl and tpl.version) else "1.0.0",
                 report_type=report_type,
                 generated_file_size=file_size,
                 download_count=0,
@@ -248,15 +261,15 @@ class DocumentService:
         doc_in_data = {
             "user_id": user.id,
             "template_id": None,
-            "html_template_id": template_id,
-            "template_name": tpl.name,
-            "name": f"{tpl.name.upper()}_{report_type}_Report_{new_date_label()}",
+            "html_template_id": tpl.id if tpl else None,
+            "template_name": tpl.name if tpl else "HTML Drafting Studio",
+            "name": f"{(tpl.name.upper() if tpl else 'REPORT')}_{report_type}_Report_{new_date_label()}",
             "excel_file_name": excel_file_name,
             "html_path": saved_html_path,
             "pdf_path": None,
             "status": status,
             "execution_time_ms": 0,
-            "template_version": tpl.version if tpl.version else "1.0.0",
+            "template_version": tpl.version if (tpl and tpl.version) else "1.0.0",
             "report_type": report_type,
             "generated_file_size": file_size,
             "download_count": 0,

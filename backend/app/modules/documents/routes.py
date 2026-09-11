@@ -108,7 +108,7 @@ async def delete_document(
 @router.post("/log-generation", response_model=ApiResponse[DocumentResponse])
 async def log_generation(
     request: Request,
-    template_id: uuid.UUID = Form(..., description="Document template UUID"),
+    template_id: str = Form(..., description="Document template identifier or UUID"),
     excel_file_name: str = Form("dynamic_drafting_studio.xlsx", description="Name of the file parsed"),
     report_type: str = Form("PSUR", description="Type of report generated"),
     report_content: str = Form("", description="HTML template compilation text"),
@@ -140,12 +140,21 @@ async def log_generation(
     # Resolve the HtmlTemplate name to display it in history
     from sqlalchemy import select
     from app.modules.templates.model import HtmlTemplate
-    stmt = select(HtmlTemplate).where(HtmlTemplate.id == template_id)
-    res = await db.execute(stmt)
-    html_tpl = res.scalar_one_or_none()
-    if html_tpl:
-        resp_data.template_name = html_tpl.name
-        resp_data.template_version = html_tpl.version
+    tpl = None
+    try:
+        val_uuid = uuid.UUID(str(template_id))
+        stmt = select(HtmlTemplate).where(HtmlTemplate.id == val_uuid)
+        res = await db.execute(stmt)
+        tpl = res.scalar_one_or_none()
+    except ValueError:
+        pass
+    if not tpl:
+        stmt = select(HtmlTemplate).where(HtmlTemplate.is_active == True)
+        res = await db.execute(stmt)
+        tpl = res.scalar_one_or_none()
+    if tpl:
+        resp_data.template_name = tpl.name
+        resp_data.template_version = tpl.version
     else:
         resp_data.template_name = "HTML Drafting Studio"
         resp_data.template_version = "1.0.0"

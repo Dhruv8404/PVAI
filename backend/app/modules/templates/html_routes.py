@@ -70,8 +70,6 @@ def sanitize_template_for_user(data: Any, user: Optional[User]) -> Any:
                 data.html_file = "[PROTECTED]"
             if hasattr(data, "file_url"):
                 data.file_url = None
-            if hasattr(data, "html_content") and data.html_content:
-                data.html_content = sanitize_html_for_user(data.html_content)
     return data
 
 

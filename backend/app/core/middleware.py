@@ -200,12 +200,17 @@ def setup_middlewares(app: FastAPI) -> None:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed)
 
     # 7. Add CORS last (So it executes outer-most to handle preflights)
-    if settings.BACKEND_CORS_ORIGINS:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=[str(origin).strip("/") for origin in settings.BACKEND_CORS_ORIGINS],
-            allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://pvai-.*\.vercel\.app",
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
+    cors_origins = [str(origin).strip("/") for origin in settings.BACKEND_CORS_ORIGINS] if settings.BACKEND_CORS_ORIGINS else ["*"]
+    if "http://localhost:5173" not in cors_origins:
+        cors_origins.append("http://localhost:5173")
+    if "http://127.0.0.1:5173" not in cors_origins:
+        cors_origins.append("http://127.0.0.1:5173")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://.*\.vercel\.app",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
