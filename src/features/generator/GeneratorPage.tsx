@@ -498,7 +498,8 @@ export const GeneratorPage: React.FC = () => {
         reportType: reportType,
         status: status as any,
         excelFileName: excelFileName,
-        htmlContent: reportContent || "<p>Report Generated</p>"
+        htmlContent: reportContent || "<p>Report Generated</p>",
+        downloadCount: 0
       });
 
       await refreshSession();
